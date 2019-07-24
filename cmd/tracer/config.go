@@ -1,9 +1,8 @@
 package main
 
 import (
-	"flag"
-
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/tracer/config"
+	flag "github.com/spf13/pflag"
 )
 
 const (

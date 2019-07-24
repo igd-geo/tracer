@@ -10,7 +10,7 @@ import (
 )
 
 type Tracer struct {
-	msgs     <-chan []byte
+	msgs     <-chan rabbitmq.Delivery
 	consumer *rabbitmq.Consumer
 	mongoDB  *mongodb.Client
 	dgraph   *dgraph.Client
@@ -18,10 +18,10 @@ type Tracer struct {
 }
 
 func New(config *config.Config) *Tracer {
-	ch := make(chan []byte)
+	msgChan := make(chan rabbitmq.Delivery)
 	tracer := Tracer{
-		msgs:     make(chan []byte),
-		consumer: rabbitmq.NewConsumer(config.RabbitURL, ch, config.ConsumerTag),
+		msgs:     msgChan,
+		consumer: rabbitmq.NewConsumer(config.RabbitURL, msgChan, config.ConsumerTag),
 		mongoDB: mongodb.NewClient(
 			config.MongoURL,
 			config.MongoDatabase,
@@ -36,11 +36,8 @@ func New(config *config.Config) *Tracer {
 
 func (tracer *Tracer) Listen() {
 	go func() {
-		for {
-			select {
-			case msg := <-tracer.msgs:
-				fmt.Println(msg)
-			}
+		for msg := range tracer.msgs {
+			fmt.Println(msg)
 		}
 	}()
 }

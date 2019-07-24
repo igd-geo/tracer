@@ -14,7 +14,11 @@ type Consumer struct {
 	done    chan error
 }
 
-func NewConsumer(url string, msgChan chan<- []byte, ctag string) *Consumer {
+type Delivery struct {
+	amqp.Delivery
+}
+
+func NewConsumer(url string, msgChan chan<- Delivery, ctag string) *Consumer {
 	c := &Consumer{
 		conn:    nil,
 		channel: nil,
@@ -93,9 +97,9 @@ func (c *Consumer) Shutdown() error {
 	return <-c.done
 }
 
-func handle(msgs <-chan amqp.Delivery, ch chan<- []byte, done chan error) {
+func handle(msgs <-chan amqp.Delivery, ch chan<- Delivery, done chan error) {
 	for d := range msgs {
-		ch <- d.Body
+		ch <- Delivery{d}
 	}
 	done <- nil
 }
