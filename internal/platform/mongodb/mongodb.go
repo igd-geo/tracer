@@ -38,3 +38,15 @@ func NewClient(mongoURL, mongoDatabase, collEntity, collAgent, collActivity stri
 		},
 	}
 }
+
+func (client *Client) EntityUID(id string) (string, error) {
+	return "", nil
+}
+
+func (client *Client) AgentUID(id string) (string, error) {
+	return "", nil
+}
+
+func (client *Client) ActivitytUID(id string) (string, error) {
+	return "", nil
+}

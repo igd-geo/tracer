@@ -14,9 +14,7 @@ type Consumer struct {
 	done    chan error
 }
 
-type Delivery struct {
-	amqp.Delivery
-}
+type Delivery []byte
 
 func NewConsumer(url string, msgChan chan<- Delivery, ctag string) *Consumer {
 	c := &Consumer{
@@ -32,7 +30,7 @@ func NewConsumer(url string, msgChan chan<- Delivery, ctag string) *Consumer {
 	go func() {
 		err := <-c.conn.NotifyClose(make(chan *amqp.Error))
 		if err != nil {
-			fmt.Printf("closing: %s", err)
+			log.Printf("closing: %s", err)
 		}
 	}()
 
@@ -68,7 +66,7 @@ func NewConsumer(url string, msgChan chan<- Delivery, ctag string) *Consumer {
 		nil)
 	failOnError(err, "Failed to bind a queue")
 
-	msgs, err := c.channel.Consume(
+	deliveries, err := c.channel.Consume(
 		queue.Name, // queue
 		c.tag,      // consumer
 		true,       // auto ack
@@ -79,13 +77,13 @@ func NewConsumer(url string, msgChan chan<- Delivery, ctag string) *Consumer {
 	)
 	failOnError(err, "Failed to register a consumer")
 
-	go handle(msgs, msgChan, c.done)
+	go handle(deliveries, msgChan, c.done)
 
 	return c
 }
 
 func (c *Consumer) Shutdown() error {
-	fmt.Println("\nShutting Down...")
+	log.Println("\nShutting Down...")
 	if err := c.channel.Cancel(c.tag, true); err != nil {
 		return fmt.Errorf("Consumer cancel failed: %s", err)
 	}
@@ -97,9 +95,10 @@ func (c *Consumer) Shutdown() error {
 	return <-c.done
 }
 
-func handle(msgs <-chan amqp.Delivery, ch chan<- Delivery, done chan error) {
-	for d := range msgs {
-		ch <- Delivery{d}
+func handle(deliveries <-chan amqp.Delivery, ch chan<- Delivery, done chan error) {
+	for d := range deliveries {
+		log.Printf("%+v", d)
+		ch <- Delivery(d.Body)
 	}
 	done <- nil
 }

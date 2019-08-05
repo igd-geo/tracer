@@ -30,27 +30,19 @@ type Entity struct {
 	UID            string    `json:"uid,omitempty"`
 	ID             string    `json:"id,omitempty"`
 	URI            string    `json:"uri,omitempty"`
-	Title          string    `json:"title,omitempty"`
-	WasDerivedFrom *Entity   `json:"wasDerivedFrom,omitempty"`
+	Name           string    `json:"name,omitempty"`
+	CreationDate   string    `json:"creationDate,omitempty"`
+	WasDerivedFrom []*Entity `json:"wasDerivedFrom,omitempty"`
 	WasGeneratedBy *Activity `json:"wasGeneratedBy,omitempty"`
-	/*
-		Revision       int       `json:"revision,omitempty"`
-		Type           string    `json:"type,omitempty"`
-		Date           string    `json:"date,omitempty"`
-	*/
 }
 
 type Activity struct {
 	UID               string    `json:"uid,omitempty"`
 	ID                string    `json:"id,omitempty"`
-	Title             string    `json:"title,omitempty"`
+	StartDate         string    `json:"startDate,omitempty"`
+	EndDate           string    `json:"endDate,omitempty"`
 	WasAssociatedWith *Agent    `json:"wasAssociatedWith,omitempty"`
 	Used              []*Entity `json:"used,omitempty"`
-	/*
-		Type              string    `json:"type,omitempty"`
-		StartTime         string    `json:"startTime,omitempty"`
-		EndTime           string    `json:"endTime,omitempty"`
-	*/
 }
 
 type Agent struct {
@@ -58,17 +50,6 @@ type Agent struct {
 	ID              string `json:"id,omitempty"`
 	Name            string `json:"name,omitempty"`
 	ActedOnBehalfOf *Agent `json:"actedOnBehalfOf,omitempty"`
-	/*
-		Telephone          string `json:"phone,omitempty"`
-		Facsimile          string `json:"fax,omitempty"`
-		Address            string `json:"address,omitempty"`
-		City               string `json:"city,omitempty"`
-		AdministrativeArea string `json:"area,omitempty"`
-		PostalCode         string `json:"postal,omitempty"`
-		Country            string `json:"country,omitempty"`
-		Email              string `json:"email,omitempty"`
-		Role               string `json:"role,omitempty"`
-	*/
 }
 
 func NewClient(dgraphURL string) *Client {
@@ -84,19 +65,30 @@ func NewClient(dgraphURL string) *Client {
 	}
 }
 
-func (c *Client) AddDerivate(derivate *Entity) error {
+func NewEntity(uid string) *Entity {
+	return &Entity{UID: uid}
+}
+
+func NewAgent(uid string) *Agent {
+	return &Agent{UID: uid}
+}
+
+func NewActivity() *Activity {
+	return &Activity{}
+}
+
+func (c *Client) AddDerivate(derivate *Entity) (map[string]string, error) {
 	payload, err := json.MarshalIndent(derivate, "", " ")
 	if err != nil {
-		log.Fatal(err)
-		return err
+		return nil, err
 	}
 
-	_, err = c.runMutation(payload)
+	assigned, err := c.runMutation(payload)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	return nil
+	return assigned.GetUids(), nil
 }
 
 func (c *Client) QueryParentEntity(id string, revision string) *Entity {
