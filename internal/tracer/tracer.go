@@ -55,12 +55,6 @@ type Entity struct {
 	} `json:"wasDerivedFrom,omitempty"`
 }
 
-type uids struct {
-	used       []string
-	agent      string
-	supervisor string
-}
-
 func New(config *config.Config) *Tracer {
 	msgChan := make(chan rabbitmq.Delivery)
 	tracer := Tracer{
@@ -98,7 +92,18 @@ func (tracer *Tracer) handleDelivery(delivery rabbitmq.Delivery) {
 		return
 	}
 
-	//fmt.Println(dgraph.Derivate(entity))
+	err = tracer.createGraphEntry(&entity)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = tracer.createMongoEntries(&entity)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
 }
 
 func (tracer *Tracer) createGraphEntry(e *Entity) error {
@@ -107,6 +112,45 @@ func (tracer *Tracer) createGraphEntry(e *Entity) error {
 	entity := dgraph.NewEntity("derivate")
 	entity.WasGeneratedBy.UID = "activity"
 
+	if err := tracer.fetchUsedEntities(e, entity); err != nil {
+		return err
+	}
+
+	if err, createAgent, createSupevisor = tracer.fetchAgents(e, entity); err != nil {
+		return err
+	}
+
+	e.mapStruct(entity, createAgent, createSupevisor)
+
+	assigned, err := tracer.dgraph.AddDerivate(entity)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(assigned)
+
+	e.UID = assigned["derivate"]
+	e.WasGeneratedBy.UID = assigned["activity"]
+	if createAgent {
+		e.WasGeneratedBy.WasAssociatedWith.UID = assigned["agent"]
+		uid, payload := e.WasGeneratedBy.WasAssociatedWith.UID, e.WasGeneratedBy.WasAssociatedWith.Optional
+		if err = tracer.mongoDB.InsertAgent(uid, payload); err != nil {
+			return err
+		}
+	}
+	if createSupevisor {
+		e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = assigned["supervisor"]
+		uid, payload := e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID,
+			e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Optional
+		if err = tracer.mongoDB.InsertAgent(uid, payload); err != nil {
+			return err
+		}
+	}
+
+	return err
+}
+
+func (tracer *Tracer) fetchUsedEntities(e *Entity, entity *dgraph.Entity) error {
 	for i, used := range e.WasGeneratedBy.Used {
 		usedUID, err := tracer.mongoDB.EntityUID(used.ID)
 		if err != nil {
@@ -115,10 +159,15 @@ func (tracer *Tracer) createGraphEntry(e *Entity) error {
 		e.WasGeneratedBy.Used[i].UID = usedUID
 		entity.WasGeneratedBy.Used = append(entity.WasGeneratedBy.Used, dgraph.NewEntity(usedUID))
 	}
+	return nil
+}
 
+func (tracer *Tracer) fetchAgents(e *Entity, entity *dgraph.Entity) (error, bool, bool) {
+	var err error
+	createAgent, createSupevisor := false, false
 	e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID, err = tracer.mongoDB.AgentUID(e.WasGeneratedBy.WasAssociatedWith.ID)
 	if err != nil {
-		return err
+		return err, createAgent, createSupevisor
 	}
 
 	if e.WasGeneratedBy.WasAssociatedWith.UID != "" {
@@ -128,29 +177,23 @@ func (tracer *Tracer) createGraphEntry(e *Entity) error {
 
 	e.WasGeneratedBy.WasAssociatedWith.UID, err = tracer.mongoDB.AgentUID(e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID)
 	if err != nil {
-		return err
+		return err, createAgent, createSupevisor
 	}
 
 	if e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID != "" {
 		e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = "supervisor"
 		createSupevisor = true
 	}
+	return err, createAgent, createSupevisor
+}
 
-	e.mapStruct(entity, createAgent, createSupevisor)
-
-	assigned, err := tracer.dgraph.AddDerivate(entity)
-	fmt.Println(assigned)
-
-	e.UID = assigned["derivate"]
-	e.WasGeneratedBy.UID = assigned["activity"]
-	if createAgent {
-		e.WasGeneratedBy.WasAssociatedWith.UID = assigned["agent"]
-	}
-	if createSupevisor {
-		e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = assigned["supervisor"]
+func (tracer *Tracer) createMongoEntries(e *Entity) error {
+	err := tracer.mongoDB.InsertEntity(e.UID, e.Optional)
+	if err != nil {
+		return err
 	}
 
-	return err
+	return tracer.mongoDB.InsertActivity(e.WasGeneratedBy.UID, e.WasGeneratedBy.Optional)
 }
 
 func (e *Entity) mapStruct(entity *dgraph.Entity, createAgent bool, createSupevisor bool) {
@@ -175,6 +218,3 @@ func (e *Entity) mapStruct(entity *dgraph.Entity, createAgent bool, createSupevi
 		entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Name = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Name
 	}
 }
-
-func generateEntry()    {}
-func generateMutation() {}

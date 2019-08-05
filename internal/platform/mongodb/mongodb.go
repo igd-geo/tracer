@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"time"
 
@@ -49,4 +50,28 @@ func (client *Client) AgentUID(id string) (string, error) {
 
 func (client *Client) ActivitytUID(id string) (string, error) {
 	return "", nil
+}
+
+func (client *Client) InsertEntity(uid string, payload json.RawMessage) error {
+	return nil
+}
+
+func (client *Client) InsertAgent(uid string, payload json.RawMessage) error {
+	return nil
+}
+
+func (client *Client) InsertActivity(uid string, payload json.RawMessage) error {
+	return nil
+}
+
+func (client *Client) FetchEntity() error {
+	return nil
+}
+
+func (client *Client) FetchAgent() error {
+	return nil
+}
+
+func (client *Client) FetchActivity() error {
+	return nil
 }
