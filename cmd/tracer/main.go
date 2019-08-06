@@ -14,6 +14,7 @@ func main() {
 	signal.Notify(signalChan, os.Interrupt)
 
 	config := config.New()
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	installFlags(config)
 
 	tracer := tracer.New(config)

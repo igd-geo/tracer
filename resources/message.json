@@ -1,0 +1,26 @@
+{
+  "entity": {
+    "id": "new_doc",
+    "uri": "http://new_doc.com",
+    "name": "New Document",
+    "creationDate": "06-19-2019",
+    "Data": {},
+    "wasGeneratedBy": {
+      "id": "new_activity",
+      "startDate": "06-18-2019",
+      "endDate": "06-19-2019",
+      "Data": {},
+      "wasAssociatedWith": {
+        "id": "mitarbeiter_1",
+        "name": "Peter",
+        "Data": {},
+        "actedOnBehalfOf": {
+          "id": "mitarbeiter_2",
+          "name": "Hans",
+          "Data": {}
+        }
+      },
+      "used": []
+    }
+  }
+}

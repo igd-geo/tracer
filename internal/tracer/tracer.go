@@ -20,7 +20,7 @@ type Tracer struct {
 }
 
 type Delivery struct {
-	entity Entity
+	Entity Entity `json:"entity,omitempty"`
 }
 
 type Entity struct {
@@ -29,23 +29,23 @@ type Entity struct {
 	URI            string          `json:"uri,omitempty"`
 	Name           string          `json:"name,omitempty"`
 	CreationDate   string          `json:"creationDate,omitempty"`
-	Optional       json.RawMessage `json:"optional,omitempty"`
+	Data           json.RawMessage `json:"optional,omitempty"`
 	WasGeneratedBy struct {
 		UID               string          `json:"uid,omitempty"`
 		ID                string          `json:"id,omitempty"`
 		StartDate         string          `json:"startDate,omitempty"`
 		EndDate           string          `json:"endDate,omitempty"`
-		Optional          json.RawMessage `json:"optional,omitempty"`
+		Data              json.RawMessage `json:"optional,omitempty"`
 		WasAssociatedWith struct {
 			UID             string          `json:"uid,omitempty"`
 			ID              string          `json:"id,omitempty"`
 			Name            string          `json:"name,omitempty"`
-			Optional        json.RawMessage `json:"optional,omitempty"`
+			Data            json.RawMessage `json:"optional,omitempty"`
 			ActedOnBehalfOf struct {
-				UID      string          `json:"uid,omitempty"`
-				ID       string          `json:"id,omitempty"`
-				Name     string          `json:"name,omitempty"`
-				Optional json.RawMessage `json:"optional,omitempty"`
+				UID  string          `json:"uid,omitempty"`
+				ID   string          `json:"id,omitempty"`
+				Name string          `json:"name,omitempty"`
+				Data json.RawMessage `json:"optional,omitempty"`
 			} `json:"actedOnBehalfOf,omitempty"`
 		}
 		Used []struct {
@@ -63,7 +63,7 @@ func New(config *config.Config) *Tracer {
 	msgChan := make(chan rabbitmq.Delivery)
 	tracer := Tracer{
 		deliveries: msgChan,
-		rbSession:  rabbitmq.New(config.RabbitURL, msgChan, config.ConsumerTag, "", ""),
+		rbSession:  rabbitmq.New(config.RabbitURL, msgChan, config.ConsumerTag, "notifactions", "topic"),
 		mongoDB: mongodb.NewClient(
 			config.MongoURL,
 			config.MongoDatabase,
@@ -89,20 +89,20 @@ func (tracer *Tracer) Cleanup() error {
 }
 
 func (tracer *Tracer) handleDelivery(rbDelivery rabbitmq.Delivery) {
-	var delivery Delivery
+	delivery := Delivery{}
 	err := json.Unmarshal(rbDelivery, &delivery)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	err = tracer.createGraphEntry(&delivery.entity)
+	err = tracer.createGraphEntry(&delivery.Entity)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	err = tracer.createMongoEntries(&delivery.entity)
+	err = tracer.createMongoEntries(&delivery.Entity)
 	if err != nil {
 		log.Println(err)
 		return
@@ -113,8 +113,7 @@ func (tracer *Tracer) handleDelivery(rbDelivery rabbitmq.Delivery) {
 func (tracer *Tracer) createGraphEntry(e *Entity) error {
 	var err error
 	createAgent, createSupevisor := false, false
-	entity := dgraph.NewEntity("derivate")
-	entity.WasGeneratedBy.UID = "activity"
+	entity := dgraph.NewEntity()
 
 	if err := tracer.fetchUsedEntities(e, entity); err != nil {
 		return err
@@ -133,20 +132,31 @@ func (tracer *Tracer) createGraphEntry(e *Entity) error {
 
 	fmt.Println(assigned)
 
-	e.UID = assigned["derivate"]
-	e.WasGeneratedBy.UID = assigned["activity"]
+	e.UID = assigned["_:derivate"]
+	e.WasGeneratedBy.UID = assigned["_:activity"]
 	if createAgent {
-		e.WasGeneratedBy.WasAssociatedWith.UID = assigned["agent"]
-		uid, payload := e.WasGeneratedBy.WasAssociatedWith.UID, e.WasGeneratedBy.WasAssociatedWith.Optional
-		if err = tracer.mongoDB.InsertAgent(uid, payload); err != nil {
+		e.WasGeneratedBy.WasAssociatedWith.UID = assigned["_:agent"]
+
+		mongoAgent := mongodb.NewAgent()
+		mongoAgent.UID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID
+		mongoAgent.ID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID
+		mongoAgent.Name = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Name
+		mongoAgent.Data = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Data
+
+		if err = tracer.mongoDB.InsertAgent(mongoAgent); err != nil {
 			return err
 		}
 	}
 	if createSupevisor {
-		e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = assigned["supervisor"]
-		uid, payload := e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID,
-			e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Optional
-		if err = tracer.mongoDB.InsertAgent(uid, payload); err != nil {
+		e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = assigned["_:supervisor"]
+
+		mongoAgent := mongodb.NewAgent()
+		mongoAgent.UID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID
+		mongoAgent.ID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID
+		mongoAgent.Name = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Name
+		mongoAgent.Data = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Data
+
+		if err = tracer.mongoDB.InsertAgent(mongoAgent); err != nil {
 			return err
 		}
 	}
@@ -156,48 +166,55 @@ func (tracer *Tracer) createGraphEntry(e *Entity) error {
 
 func (tracer *Tracer) fetchUsedEntities(e *Entity, entity *dgraph.Entity) error {
 	for i, used := range e.WasGeneratedBy.Used {
-		usedUID, err := tracer.mongoDB.EntityUID(used.ID)
-		if err != nil {
-			return err
-		}
+		usedUID := tracer.mongoDB.EntityUID(used.ID)
 		e.WasGeneratedBy.Used[i].UID = usedUID
-		entity.WasGeneratedBy.Used = append(entity.WasGeneratedBy.Used, dgraph.NewEntity(usedUID))
+		entity.WasGeneratedBy.Used = append(entity.WasGeneratedBy.Used, dgraph.NewEntity())
 	}
 	return nil
 }
 
 func (tracer *Tracer) fetchAgents(e *Entity, entity *dgraph.Entity) (error, bool, bool) {
 	var err error
-	createAgent, createSupevisor := false, false
-	e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID, err = tracer.mongoDB.AgentUID(e.WasGeneratedBy.WasAssociatedWith.ID)
-	if err != nil {
-		return err, createAgent, createSupevisor
+	createAgent, createSupevisor := true, true
+
+	agentUID := tracer.mongoDB.AgentUID(e.WasGeneratedBy.WasAssociatedWith.ID)
+
+	if agentUID != "" {
+		e.WasGeneratedBy.WasAssociatedWith.UID = agentUID
+		createAgent = false
 	}
 
-	if e.WasGeneratedBy.WasAssociatedWith.UID != "" {
-		e.WasGeneratedBy.WasAssociatedWith.UID = "agent"
-		createAgent = true
-	}
+	supervisorUID := tracer.mongoDB.AgentUID(e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID)
 
-	e.WasGeneratedBy.WasAssociatedWith.UID, err = tracer.mongoDB.AgentUID(e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID)
-	if err != nil {
-		return err, createAgent, createSupevisor
-	}
-
-	if e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID != "" {
-		e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = "supervisor"
-		createSupevisor = true
+	if supervisorUID != "" {
+		e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = supervisorUID
+		createSupevisor = false
 	}
 	return err, createAgent, createSupevisor
 }
 
 func (tracer *Tracer) createMongoEntries(e *Entity) error {
-	err := tracer.mongoDB.InsertEntity(e.UID, e.Optional)
+	mongoEntity := mongodb.NewEntity()
+	mongoEntity.UID = e.UID
+	mongoEntity.ID = e.ID
+	mongoEntity.URI = e.URI
+	mongoEntity.Name = e.Name
+	mongoEntity.CreationDate = e.CreationDate
+	mongoEntity.Data = e.Data
+
+	err := tracer.mongoDB.InsertEntity(mongoEntity)
 	if err != nil {
 		return err
 	}
 
-	return tracer.mongoDB.InsertActivity(e.WasGeneratedBy.UID, e.WasGeneratedBy.Optional)
+	mongoActivity := mongodb.NewActivity()
+	mongoActivity.UID = e.WasGeneratedBy.UID
+	mongoActivity.ID = e.WasGeneratedBy.ID
+	mongoActivity.StartDate = e.WasGeneratedBy.StartDate
+	mongoActivity.EndDate = e.WasGeneratedBy.EndDate
+	mongoActivity.Data = e.WasGeneratedBy.Data
+
+	return tracer.mongoDB.InsertActivity(mongoActivity)
 }
 
 func (e *Entity) mapStruct(entity *dgraph.Entity, createAgent bool, createSupevisor bool) {
@@ -209,16 +226,18 @@ func (e *Entity) mapStruct(entity *dgraph.Entity, createAgent bool, createSupevi
 	entity.WasGeneratedBy.StartDate = e.WasGeneratedBy.StartDate
 	entity.WasGeneratedBy.EndDate = e.WasGeneratedBy.EndDate
 	entity.WasDerivedFrom = entity.WasGeneratedBy.Used
-	entity.WasGeneratedBy.WasAssociatedWith.UID = e.WasGeneratedBy.WasAssociatedWith.UID
-	entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID
 
 	if createAgent {
 		entity.WasGeneratedBy.WasAssociatedWith.ID = e.WasGeneratedBy.WasAssociatedWith.ID
 		entity.WasGeneratedBy.WasAssociatedWith.Name = e.WasGeneratedBy.WasAssociatedWith.Name
+	} else {
+		entity.WasGeneratedBy.WasAssociatedWith.UID = e.WasGeneratedBy.WasAssociatedWith.UID
 	}
 
 	if createSupevisor {
 		entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID
 		entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Name = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Name
+	} else {
+		entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID
 	}
 }

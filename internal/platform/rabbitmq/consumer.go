@@ -83,7 +83,7 @@ func newConsumer(url string, msgChan chan<- Delivery, ctag string) *consumer {
 }
 
 func (c *consumer) shutdown() error {
-	log.Println("\nShutting Down...")
+	log.Println("Shutting Down...")
 	if err := c.channel.Cancel(c.tag, true); err != nil {
 		return fmt.Errorf("Consumer cancel failed: %s", err)
 	}

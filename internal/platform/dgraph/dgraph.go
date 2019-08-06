@@ -65,23 +65,35 @@ func NewClient(dgraphURL string) *Client {
 	}
 }
 
-func NewEntity(uid string) *Entity {
-	return &Entity{UID: uid}
+func NewEntity() *Entity {
+	return &Entity{
+		UID: "_:entity",
+		WasGeneratedBy: &Activity{
+			UID: "_:activity",
+			WasAssociatedWith: &Agent{
+				UID: "_:agent",
+				ActedOnBehalfOf: &Agent{
+					UID: "_:supervisor",
+				},
+			},
+		},
+	}
 }
 
 func NewAgent(uid string) *Agent {
 	return &Agent{UID: uid}
 }
 
-func NewActivity() *Activity {
+func NewActivity(uid string) *Activity {
 	return &Activity{}
 }
 
 func (c *Client) AddDerivate(derivate *Entity) (map[string]string, error) {
-	payload, err := json.MarshalIndent(derivate, "", " ")
+	payload, err := json.Marshal(derivate)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(string(payload))
 
 	assigned, err := c.runMutation(payload)
 	if err != nil {

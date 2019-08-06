@@ -14,7 +14,6 @@ type producer struct {
 	channel    *amqp.Channel
 	exchange   string
 	routingKey string
-	done       chan error
 }
 
 func newProducer(url string, exchange string, routingKey string) *producer {
@@ -23,18 +22,11 @@ func newProducer(url string, exchange string, routingKey string) *producer {
 		channel:    nil,
 		exchange:   exchange,
 		routingKey: routingKey,
-		done:       make(chan error),
 	}
 	var err error
 
 	p.conn, err = amqp.Dial(url)
 	failOnError(err, "Failed to connect to RabbitMQ")
-	go func() {
-		err := <-p.conn.NotifyClose(make(chan *amqp.Error))
-		if err != nil {
-			log.Printf("closing: %s", err)
-		}
-	}()
 
 	p.channel, err = p.conn.Channel()
 	failOnError(err, "Failed to open a channel")
@@ -76,12 +68,13 @@ func (p *producer) publish(body string) error {
 }
 
 func (p *producer) shutdown() error {
-	log.Println("\nShutting Down...")
+	log.Println("Shutting Down...")
+	p.channel.Close()
 	if err := p.conn.Close(); err != nil {
 		return fmt.Errorf("AMQP connection close error: %s", err)
 	}
 
-	return <-p.done
+	return nil
 }
 
 func confirmOne(confirms <-chan amqp.Confirmation) {

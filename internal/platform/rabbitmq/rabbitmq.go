@@ -1,6 +1,9 @@
 package rabbitmq
 
-import "log"
+import (
+	"fmt"
+	"log"
+)
 
 type Session struct {
 	consumer *consumer
@@ -20,6 +23,7 @@ func (s *Session) Shutdown() error {
 	}
 
 	if err := s.producer.shutdown(); err != nil {
+		fmt.Println(err)
 		return err
 	}
 	return nil

@@ -7,11 +7,11 @@ import (
 
 const (
 	// Dgraph
-	defaultDgraphURL = "http://localhost:9080"
+	defaultDgraphURL = "localhost:9080"
 
 	// MongoDB
-	defaultMongoURL                = "mongodb://localhost:27017"
-	defaultMongoDatabase           = "provenance"
+	defaultMongoURL                = "mongodb://root:example@localhost:27017"
+	defaultMongoDatabase           = "tracer"
 	defaultMongoCollectionEntity   = "entity"
 	defaultMongoCollectionAgent    = "agent"
 	defaultMongoCollectionActivity = "activity"
