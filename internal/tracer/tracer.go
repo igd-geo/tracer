@@ -13,10 +13,14 @@ import (
 
 type Tracer struct {
 	deliveries <-chan rabbitmq.Delivery
-	consumer   *rabbitmq.Consumer
+	rbSession  *rabbitmq.Session
 	mongoDB    *mongodb.Client
 	dgraph     *dgraph.Client
 	config     *config.Config
+}
+
+type Delivery struct {
+	entity Entity
 }
 
 type Entity struct {
@@ -59,7 +63,7 @@ func New(config *config.Config) *Tracer {
 	msgChan := make(chan rabbitmq.Delivery)
 	tracer := Tracer{
 		deliveries: msgChan,
-		consumer:   rabbitmq.NewConsumer(config.RabbitURL, msgChan, config.ConsumerTag),
+		rbSession:  rabbitmq.New(config.RabbitURL, msgChan, config.ConsumerTag, "", ""),
 		mongoDB: mongodb.NewClient(
 			config.MongoURL,
 			config.MongoDatabase,
@@ -81,24 +85,24 @@ func (tracer *Tracer) Listen() {
 }
 
 func (tracer *Tracer) Cleanup() error {
-	return tracer.consumer.Shutdown()
+	return tracer.rbSession.Shutdown()
 }
 
-func (tracer *Tracer) handleDelivery(delivery rabbitmq.Delivery) {
-	var entity Entity
-	err := json.Unmarshal(delivery, &entity)
+func (tracer *Tracer) handleDelivery(rbDelivery rabbitmq.Delivery) {
+	var delivery Delivery
+	err := json.Unmarshal(rbDelivery, &delivery)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	err = tracer.createGraphEntry(&entity)
+	err = tracer.createGraphEntry(&delivery.entity)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	err = tracer.createMongoEntries(&entity)
+	err = tracer.createMongoEntries(&delivery.entity)
 	if err != nil {
 		log.Println(err)
 		return

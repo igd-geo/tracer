@@ -7,7 +7,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-type Consumer struct {
+type consumer struct {
 	conn    *amqp.Connection
 	channel *amqp.Channel
 	tag     string
@@ -16,8 +16,8 @@ type Consumer struct {
 
 type Delivery []byte
 
-func NewConsumer(url string, msgChan chan<- Delivery, ctag string) *Consumer {
-	c := &Consumer{
+func newConsumer(url string, msgChan chan<- Delivery, ctag string) *consumer {
+	c := &consumer{
 		conn:    nil,
 		channel: nil,
 		tag:     ctag,
@@ -60,7 +60,7 @@ func NewConsumer(url string, msgChan chan<- Delivery, ctag string) *Consumer {
 
 	err = c.channel.QueueBind(
 		queue.Name,      // queue name
-		"prov.*",        // routing key
+		"#.tracer.#",    // routing key
 		"notifications", // exchange
 		false,
 		nil)
@@ -82,7 +82,7 @@ func NewConsumer(url string, msgChan chan<- Delivery, ctag string) *Consumer {
 	return c
 }
 
-func (c *Consumer) Shutdown() error {
+func (c *consumer) shutdown() error {
 	log.Println("\nShutting Down...")
 	if err := c.channel.Cancel(c.tag, true); err != nil {
 		return fmt.Errorf("Consumer cancel failed: %s", err)
@@ -101,10 +101,4 @@ func handle(deliveries <-chan amqp.Delivery, ch chan<- Delivery, done chan error
 		ch <- Delivery(d.Body)
 	}
 	done <- nil
-}
-
-func failOnError(err error, msg string) {
-	if err != nil {
-		log.Fatalf("%s: %s", msg, err)
-	}
 }

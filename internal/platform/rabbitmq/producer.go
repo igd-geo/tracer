@@ -9,20 +9,18 @@ import (
 
 // TODO: Confirms
 
-type Producer struct {
+type producer struct {
 	conn       *amqp.Connection
 	channel    *amqp.Channel
-	tag        string
 	exchange   string
 	routingKey string
 	done       chan error
 }
 
-func NewProducer(url string, exchange string, routingKey string, ctag string, reliable bool) *Producer {
-	p := &Producer{
+func newProducer(url string, exchange string, routingKey string) *producer {
+	p := &producer{
 		conn:       nil,
 		channel:    nil,
-		tag:        ctag,
 		exchange:   exchange,
 		routingKey: routingKey,
 		done:       make(chan error),
@@ -51,37 +49,14 @@ func NewProducer(url string, exchange string, routingKey string, ctag string, re
 		nil,        // arguments
 	)
 	failOnError(err, "Failed to declare a exchange")
-	if reliable {
-		log.Printf("enabling publishing confirms.")
-		err := p.channel.Confirm(false)
-		failOnError(err, "Channel could not be put into confirm mode")
 
-		confirms := p.channel.NotifyPublish(make(chan amqp.Confirmation, 1))
-
-		defer confirmOne(confirms)
-	}
-
-	err = p.channel.Publish(
-		exchange,   // publish to an exchange
-		routingKey, // routing to 0 or more queues
-		false,      // mandatory
-		false,      // immediate
-		amqp.Publishing{
-			Headers:         amqp.Table{},
-			ContentType:     "text/plain",
-			ContentEncoding: "",
-			Body:            []byte("Hi"),
-			DeliveryMode:    amqp.Transient, // 1=non-persistent, 2=persistent
-			Priority:        0,              // 0-9
-			// a bunch of application/implementation-specific fields
-		},
-	)
-	failOnError(err, "Failed to declare a queue")
+	err = p.publish("Hi")
+	failOnError(err, "Failed to initialize producer")
 
 	return p
 }
 
-func (p *Producer) Publish(body string) error {
+func (p *producer) publish(body string) error {
 	err := p.channel.Publish(
 		p.exchange,   // publish to an exchange
 		p.routingKey, // routing to 0 or more queues
@@ -100,12 +75,8 @@ func (p *Producer) Publish(body string) error {
 	return err
 }
 
-func (p *Producer) Shutdown() error {
+func (p *producer) shutdown() error {
 	log.Println("\nShutting Down...")
-	if err := p.channel.Cancel(p.tag, true); err != nil {
-		return fmt.Errorf("Consumer cancel failed: %s", err)
-	}
-
 	if err := p.conn.Close(); err != nil {
 		return fmt.Errorf("AMQP connection close error: %s", err)
 	}
@@ -120,11 +91,5 @@ func confirmOne(confirms <-chan amqp.Confirmation) {
 		log.Printf("confirmed delivery with delivery tag: %d", confirmed.DeliveryTag)
 	} else {
 		log.Printf("failed delivery of delivery tag: %d", confirmed.DeliveryTag)
-	}
-}
-
-func failOnError(err error, msg string) {
-	if err != nil {
-		log.Fatalf("%s: %s", msg, err)
 	}
 }
