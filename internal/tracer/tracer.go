@@ -9,6 +9,7 @@ import (
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/mongodb"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/rabbitmq"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/tracer/config"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/types"
 )
 
 type Tracer struct {
@@ -21,6 +22,10 @@ type Tracer struct {
 
 type Delivery struct {
 	Entity Entity `json:"entity,omitempty"`
+}
+
+type DeliveryTest struct {
+	Entity types.Entity `json:"entity,omitempty"`
 }
 
 type Entity struct {
@@ -90,7 +95,25 @@ func (tracer *Tracer) Cleanup() error {
 
 func (tracer *Tracer) handleDelivery(rbDelivery rabbitmq.Delivery) {
 	delivery := Delivery{}
-	err := json.Unmarshal(rbDelivery, &delivery)
+	deliveryTest := DeliveryTest{}
+	err := json.Unmarshal(rbDelivery, &deliveryTest)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	log.Printf("%+v", deliveryTest.Entity.Attributes)
+	log.Printf("%+v", deliveryTest.Entity.ID)
+	log.Printf("%+v", deliveryTest.Entity.Edges)
+	log.Printf("%+v", string(deliveryTest.Entity.Data))
+	log.Printf("%+v", deliveryTest.Entity.WasGeneratedBy.WasAssociatedWith.Attributes)
+	log.Printf("%+v", deliveryTest.Entity.WasGeneratedBy.WasAssociatedWith.Edges)
+	log.Printf("%+v", string(deliveryTest.Entity.WasGeneratedBy.WasAssociatedWith.Data))
+	log.Printf("%+v", deliveryTest.Entity.WasGeneratedBy.Attributes)
+	log.Printf("%+v", deliveryTest.Entity.WasGeneratedBy.Edges)
+	log.Printf("%+v", string(deliveryTest.Entity.WasGeneratedBy.Data))
+
+	err = json.Unmarshal(rbDelivery, &delivery)
 	if err != nil {
 		log.Println(err)
 		return
