@@ -3,7 +3,6 @@ package dgraph
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 
 	"github.com/dgraph-io/dgo"
@@ -93,7 +92,6 @@ func (c *Client) AddDerivate(derivate *Entity) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(string(payload))
 
 	assigned, err := c.runMutation(payload)
 	if err != nil {
@@ -120,7 +118,6 @@ func (c *Client) QueryParentEntity(id string, revision string) *Entity {
 	if len(decode.Entity) == 0 {
 		return nil
 	}
-	fmt.Println(decode.Entity)
 	return &decode.Entity[0]
 }
 
@@ -170,7 +167,6 @@ func (c *Client) runQuery(decode *decode, query query) error {
 
 	resp, err := txn.QueryWithVars(context.Background(), query.text, query.variables)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 

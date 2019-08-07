@@ -97,7 +97,6 @@ func (c *consumer) shutdown() error {
 
 func handle(deliveries <-chan amqp.Delivery, ch chan<- Delivery, done chan error) {
 	for d := range deliveries {
-		log.Printf("%+v", d)
 		ch <- Delivery(d.Body)
 	}
 	done <- nil

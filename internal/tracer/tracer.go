@@ -1,8 +1,8 @@
 package tracer
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
 	"log"
 
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/dgraph"
@@ -96,13 +96,13 @@ func (tracer *Tracer) handleDelivery(rbDelivery rabbitmq.Delivery) {
 		return
 	}
 
-	err = tracer.createGraphEntry(&delivery.Entity)
+	createAgent, createSupervisor, err := tracer.createGraphEntry(&delivery.Entity)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	err = tracer.createMongoEntries(&delivery.Entity)
+	err = tracer.createMongoEntries(&delivery.Entity, createAgent, createSupervisor)
 	if err != nil {
 		log.Println(err)
 		return
@@ -110,70 +110,58 @@ func (tracer *Tracer) handleDelivery(rbDelivery rabbitmq.Delivery) {
 
 }
 
-func (tracer *Tracer) createGraphEntry(e *Entity) error {
+func (tracer *Tracer) createGraphEntry(e *Entity) (bool, bool, error) {
 	var err error
 	createAgent, createSupevisor := false, false
 	entity := dgraph.NewEntity()
 
 	if err := tracer.fetchUsedEntities(e, entity); err != nil {
-		return err
+		return createAgent, createSupevisor, err
 	}
 
-	if err, createAgent, createSupevisor = tracer.fetchAgents(e, entity); err != nil {
-		return err
+	if createAgent, createSupevisor, err = tracer.fetchAgents(e, entity); err != nil {
+		return createAgent, createSupevisor, err
 	}
 
 	e.mapStruct(entity, createAgent, createSupevisor)
 
 	assigned, err := tracer.dgraph.AddDerivate(entity)
 	if err != nil {
-		return err
+		return createAgent, createSupevisor, err
 	}
 
-	fmt.Println(assigned)
+	log.Printf("inserted dgraph entries as %v\n", assigned)
 
 	e.UID = assigned["entity"]
 	e.WasGeneratedBy.UID = assigned["activity"]
 	if createAgent {
 		e.WasGeneratedBy.WasAssociatedWith.UID = assigned["agent"]
-
-		mongoAgent := mongodb.NewAgent()
-		mongoAgent.UID = e.WasGeneratedBy.WasAssociatedWith.UID
-		mongoAgent.ID = e.WasGeneratedBy.WasAssociatedWith.ID
-		mongoAgent.Name = e.WasGeneratedBy.WasAssociatedWith.Name
-		mongoAgent.Data = e.WasGeneratedBy.WasAssociatedWith.Data
-
-		if err = tracer.mongoDB.InsertAgent(mongoAgent); err != nil {
-			return err
-		}
+		log.Printf("agent not in database %s, creating entry\n", e.WasGeneratedBy.WasAssociatedWith.ID)
 	}
 	if createSupevisor {
 		e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = assigned["supervisor"]
-
-		mongoAgent := mongodb.NewAgent()
-		mongoAgent.UID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID
-		mongoAgent.ID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID
-		mongoAgent.Name = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Name
-		mongoAgent.Data = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Data
-
-		if err = tracer.mongoDB.InsertAgent(mongoAgent); err != nil {
-			return err
-		}
+		log.Printf("agent not in database %s, creating entry\n", e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID)
 	}
 
-	return err
+	return createAgent, createSupevisor, err
 }
 
 func (tracer *Tracer) fetchUsedEntities(e *Entity, entity *dgraph.Entity) error {
-	for i, used := range e.WasGeneratedBy.Used {
-		usedUID := tracer.mongoDB.EntityUID(used.ID)
-		e.WasGeneratedBy.Used[i].UID = usedUID
-		entity.WasGeneratedBy.Used = append(entity.WasGeneratedBy.Used, dgraph.NewEntity())
+	numEntities := len(e.WasGeneratedBy.Used)
+	if numEntities > 0 {
+		for i, used := range e.WasGeneratedBy.Used {
+			usedUID := tracer.mongoDB.EntityUID(used.ID)
+			e.WasGeneratedBy.Used[i].UID = usedUID
+			entity.WasGeneratedBy.Used = append(entity.WasGeneratedBy.Used, dgraph.NewEntity())
+		}
+		log.Println("fetched uids of used entities")
+	} else {
+		log.Println("no used entities to fetch, skipping")
 	}
 	return nil
 }
 
-func (tracer *Tracer) fetchAgents(e *Entity, entity *dgraph.Entity) (error, bool, bool) {
+func (tracer *Tracer) fetchAgents(e *Entity, entity *dgraph.Entity) (bool, bool, error) {
 	var err error
 	createAgent, createSupevisor := true, true
 
@@ -190,10 +178,39 @@ func (tracer *Tracer) fetchAgents(e *Entity, entity *dgraph.Entity) (error, bool
 		e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = supervisorUID
 		createSupevisor = false
 	}
-	return err, createAgent, createSupevisor
+	return createAgent, createSupevisor, err
 }
 
-func (tracer *Tracer) createMongoEntries(e *Entity) error {
+func (tracer *Tracer) createMongoEntries(e *Entity, createAgent bool, createSupevisor bool) error {
+	err := tracer.createMongoEntity(e)
+	if err != nil {
+		return err
+	}
+
+	err = tracer.createMongoActivity(e)
+	if err != nil {
+		return err
+	}
+
+	if createAgent {
+		tracer.createMongoAgent(e, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	if createSupevisor {
+		tracer.createMongoAgent(e, true)
+		if err != nil {
+			return err
+		}
+	}
+
+	log.Println("inserted mongodb entries")
+	return nil
+}
+
+func (tracer *Tracer) createMongoEntity(e *Entity) error {
 	mongoEntity := mongodb.NewEntity()
 	mongoEntity.UID = e.UID
 	mongoEntity.ID = e.ID
@@ -202,11 +219,44 @@ func (tracer *Tracer) createMongoEntries(e *Entity) error {
 	mongoEntity.CreationDate = e.CreationDate
 	mongoEntity.Data = e.Data
 
-	err := tracer.mongoDB.InsertEntity(mongoEntity)
-	if err != nil {
-		return err
+	return tracer.mongoDB.InsertEntity(mongoEntity)
+}
+
+func (tracer *Tracer) createMongoAgent(e *Entity, isSupervisor bool) error {
+	mongoAgent := mongodb.NewAgent()
+	var buffer bytes.Buffer
+
+	if isSupervisor {
+		mongoAgent := mongodb.NewAgent()
+		mongoAgent.UID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID
+		mongoAgent.ID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID
+		mongoAgent.Name = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Name
+
+		err := json.Compact(&buffer, e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Data)
+
+		if err != nil {
+			return err
+		}
+
+		mongoAgent.Data = buffer.Bytes()
+	} else {
+		mongoAgent.UID = e.WasGeneratedBy.WasAssociatedWith.UID
+		mongoAgent.ID = e.WasGeneratedBy.WasAssociatedWith.ID
+		mongoAgent.Name = e.WasGeneratedBy.WasAssociatedWith.Name
+
+		err := json.Compact(&buffer, e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Data)
+
+		if err != nil {
+			return err
+		}
+
+		mongoAgent.Data = buffer.Bytes()
 	}
 
+	return tracer.mongoDB.InsertAgent(mongoAgent)
+}
+
+func (tracer *Tracer) createMongoActivity(e *Entity) error {
 	mongoActivity := mongodb.NewActivity()
 	mongoActivity.UID = e.WasGeneratedBy.UID
 	mongoActivity.ID = e.WasGeneratedBy.ID

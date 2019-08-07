@@ -1,7 +1,6 @@
 package rabbitmq
 
 import (
-	"fmt"
 	"log"
 )
 
@@ -23,7 +22,6 @@ func (s *Session) Shutdown() error {
 	}
 
 	if err := s.producer.shutdown(); err != nil {
-		fmt.Println(err)
 		return err
 	}
 	return nil
