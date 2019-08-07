@@ -77,15 +77,27 @@ func NewActivity() *Activity {
 }
 
 func (client *Client) EntityUID(id string) string {
-	return client.FetchEntity(id).UID
+	entity := client.FetchEntity(id)
+	if entity == nil {
+		return ""
+	}
+	return entity.UID
 }
 
 func (client *Client) AgentUID(id string) string {
-	return client.FetchAgent(id).UID
+	agent := client.FetchAgent(id)
+	if agent == nil {
+		return ""
+	}
+	return agent.UID
 }
 
 func (client *Client) ActivitytUID(id string) string {
-	return client.FetchActivity(id).UID
+	activity := client.FetchActivity(id)
+	if activity == nil {
+		return ""
+	}
+	return activity.UID
 }
 
 func (client *Client) InsertEntity(entity *Entity) error {
@@ -140,7 +152,7 @@ func (client *Client) FetchEntity(id string) *Entity {
 	*/
 	var result Entity
 	filter := bson.D{{Key: "id", Value: id}}
-	client.fetch(client.collections.entity, filter, &result)
+	client.fetch(client.collections.entity, filter)
 	return &result
 }
 
@@ -156,10 +168,15 @@ func (client *Client) FetchAgent(id string) *Agent {
 			return result, err
 		}
 	*/
-	var result Agent
+	var agent Agent
 	filter := bson.D{{Key: "id", Value: id}}
-	client.fetch(client.collections.agent, filter, &result)
-	return &result
+	result := client.fetch(client.collections.agent, filter)
+	err := result.Decode(&agent)
+	if err != nil {
+		return nil
+	}
+
+	return &agent
 }
 
 func (client *Client) FetchActivity(id string) *Activity {
@@ -176,16 +193,15 @@ func (client *Client) FetchActivity(id string) *Activity {
 	*/
 	var result Activity
 	filter := bson.D{{Key: "id", Value: id}}
-	client.fetch(client.collections.activity, filter, &result)
+	client.fetch(client.collections.activity, filter)
 	return &result
 
 }
 
-func (client *Client) fetch(collection string, filter bson.D, result interface{}) error {
+func (client *Client) fetch(collection string, filter bson.D) *mongo.SingleResult {
 	c := client.conn.Database(client.database).Collection(collection)
 	if c == nil {
-		return fmt.Errorf("No Collection")
+		return nil
 	}
-
-	return c.FindOne(context.TODO(), filter).Decode(&result)
+	return c.FindOne(context.TODO(), filter)
 }

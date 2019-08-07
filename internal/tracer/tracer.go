@@ -29,23 +29,23 @@ type Entity struct {
 	URI            string          `json:"uri,omitempty"`
 	Name           string          `json:"name,omitempty"`
 	CreationDate   string          `json:"creationDate,omitempty"`
-	Data           json.RawMessage `json:"optional,omitempty"`
+	Data           json.RawMessage `json:"data,omitempty"`
 	WasGeneratedBy struct {
 		UID               string          `json:"uid,omitempty"`
 		ID                string          `json:"id,omitempty"`
 		StartDate         string          `json:"startDate,omitempty"`
 		EndDate           string          `json:"endDate,omitempty"`
-		Data              json.RawMessage `json:"optional,omitempty"`
+		Data              json.RawMessage `json:"data,omitempty"`
 		WasAssociatedWith struct {
 			UID             string          `json:"uid,omitempty"`
 			ID              string          `json:"id,omitempty"`
 			Name            string          `json:"name,omitempty"`
-			Data            json.RawMessage `json:"optional,omitempty"`
+			Data            json.RawMessage `json:"data,omitempty"`
 			ActedOnBehalfOf struct {
 				UID  string          `json:"uid,omitempty"`
 				ID   string          `json:"id,omitempty"`
 				Name string          `json:"name,omitempty"`
-				Data json.RawMessage `json:"optional,omitempty"`
+				Data json.RawMessage `json:"data,omitempty"`
 			} `json:"actedOnBehalfOf,omitempty"`
 		}
 		Used []struct {
@@ -63,7 +63,7 @@ func New(config *config.Config) *Tracer {
 	msgChan := make(chan rabbitmq.Delivery)
 	tracer := Tracer{
 		deliveries: msgChan,
-		rbSession:  rabbitmq.New(config.RabbitURL, msgChan, config.ConsumerTag, "notifactions", "topic"),
+		rbSession:  rabbitmq.New(config.RabbitURL, msgChan, config.ConsumerTag, "notifications", "topic"),
 		mongoDB: mongodb.NewClient(
 			config.MongoURL,
 			config.MongoDatabase,
@@ -132,23 +132,23 @@ func (tracer *Tracer) createGraphEntry(e *Entity) error {
 
 	fmt.Println(assigned)
 
-	e.UID = assigned["_:derivate"]
-	e.WasGeneratedBy.UID = assigned["_:activity"]
+	e.UID = assigned["entity"]
+	e.WasGeneratedBy.UID = assigned["activity"]
 	if createAgent {
-		e.WasGeneratedBy.WasAssociatedWith.UID = assigned["_:agent"]
+		e.WasGeneratedBy.WasAssociatedWith.UID = assigned["agent"]
 
 		mongoAgent := mongodb.NewAgent()
-		mongoAgent.UID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID
-		mongoAgent.ID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID
-		mongoAgent.Name = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Name
-		mongoAgent.Data = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Data
+		mongoAgent.UID = e.WasGeneratedBy.WasAssociatedWith.UID
+		mongoAgent.ID = e.WasGeneratedBy.WasAssociatedWith.ID
+		mongoAgent.Name = e.WasGeneratedBy.WasAssociatedWith.Name
+		mongoAgent.Data = e.WasGeneratedBy.WasAssociatedWith.Data
 
 		if err = tracer.mongoDB.InsertAgent(mongoAgent); err != nil {
 			return err
 		}
 	}
 	if createSupevisor {
-		e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = assigned["_:supervisor"]
+		e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = assigned["supervisor"]
 
 		mongoAgent := mongodb.NewAgent()
 		mongoAgent.UID = e.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID

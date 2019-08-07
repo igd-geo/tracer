@@ -56,7 +56,7 @@ func (p *producer) publish(body string) error {
 		false,        // immediate
 		amqp.Publishing{
 			Headers:         amqp.Table{},
-			ContentType:     "text/plain",
+			ContentType:     "application/json",
 			ContentEncoding: "",
 			Body:            []byte(body),
 			DeliveryMode:    amqp.Transient, // 1=non-persistent, 2=persistent

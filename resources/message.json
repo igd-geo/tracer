@@ -1,26 +1,46 @@
 {
   "entity": {
-    "id": "new_doc",
+    "id": "new_doc2",
     "uri": "http://new_doc.com",
     "name": "New Document",
     "creationDate": "06-19-2019",
-    "Data": {},
+    "Data": {
+      "type": "Document",
+      "revision": 2,
+      "description": "...",
+      "author": "Max Mustermann"
+    },
     "wasGeneratedBy": {
       "id": "new_activity",
       "startDate": "06-18-2019",
       "endDate": "06-19-2019",
-      "Data": {},
+      "Data": {
+        "type": "aggregation",
+        "errors": 0,
+        "duration": "12h"
+      },
       "wasAssociatedWith": {
-        "id": "mitarbeiter_1",
-        "name": "Peter",
-        "Data": {},
+        "id": "prozess",
+        "name": "Exhauster",
+        "Data": {
+          "type": "Service"
+        },
         "actedOnBehalfOf": {
-          "id": "mitarbeiter_2",
+          "id": "mitarbeiter",
           "name": "Hans",
-          "Data": {}
+          "Data": {
+            "type": "Contractor",
+            "adress": "...",
+            "email": "...",
+            "phone": "..."
+          }
         }
       },
-      "used": []
+      "used": [
+        {
+          "id": "new_doc"
+        }
+      ]
     }
   }
 }
