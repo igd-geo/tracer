@@ -1,4 +1,4 @@
-package types
+package provutil
 
 import (
 	"encoding/json"
@@ -6,20 +6,20 @@ import (
 
 type Entity struct {
 	*Attributes
-	*Edges
-	Data json.RawMessage `bson:"data,omitempty"`
+	*Edges `bson:"-"`
+	Data   json.RawMessage `json:"data,omitempty" bson:"data,omitempty"`
 }
 
 type Activity struct {
 	*Attributes
-	*Edges
-	Data json.RawMessage `bson:"data,omitempty"`
+	*Edges `bson:"-"`
+	Data   json.RawMessage `json:"data,omitempty" bson:"data,omitempty"`
 }
 
 type Agent struct {
 	*Attributes
-	*Edges
-	Data json.RawMessage `bson:"data,omitempty"`
+	*Edges `bson:"-"`
+	Data   json.RawMessage `json:"data,omitempty" bson:"data,omitempty"`
 }
 
 type Attributes struct {
@@ -40,18 +40,36 @@ type Edges struct {
 	ActedOnBehalfOf   *Agent    `json:"actedOnBehalfOf,omitempty"`
 }
 
-type Data struct {
-	json.RawMessage `bson:"data,omitempty"`
-}
-
 func NewEntity() *Entity {
-	return &Entity{Attributes: &Attributes{}, Edges: &Edges{WasGeneratedBy: newActivity()}}
+	return &Entity{
+		Attributes: &Attributes{
+			UID: "_:entity",
+		},
+		Edges: &Edges{
+			WasGeneratedBy: &Activity{
+				Attributes: &Attributes{
+					UID: "_:activity",
+				},
+				Edges: &Edges{
+					WasAssociatedWith: &Agent{
+						Attributes: &Attributes{
+							UID: "_:agent",
+						},
+						Edges: &Edges{
+							ActedOnBehalfOf: &Agent{
+								Attributes: &Attributes{
+									UID: "_:supervisor",
+								},
+							},
+						},
+					},
+					Used: []*Entity{&Entity{}},
+				},
+			},
+		},
+	}
 }
 
-func newActivity() *Activity {
-	return &Activity{Attributes: &Attributes{}, Edges: &Edges{WasAssociatedWith: newAgent()}}
-}
-
-func newAgent() *Agent {
-	return &Agent{Attributes: &Attributes{}, Edges: &Edges{ActedOnBehalfOf: newAgent()}}
+func NewAttributes() *Attributes {
+	return &Attributes{}
 }

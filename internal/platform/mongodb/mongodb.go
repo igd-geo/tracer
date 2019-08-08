@@ -2,11 +2,11 @@ package mongodb
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
 
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/provutil"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -22,28 +22,6 @@ type collections struct {
 	entity   string
 	agent    string
 	activity string
-}
-
-type Entity struct {
-	UID          string          `bson:"uid,omitempty"`
-	ID           string          `bson:"id,omitempty"`
-	URI          string          `bson:"uri,omitempty"`
-	Name         string          `bson:"name,omitempty"`
-	CreationDate string          `bson:"creationDate,omitempty"`
-	Data         json.RawMessage `bson:"data,omitempty"`
-}
-type Agent struct {
-	UID  string          `bson:"uid,omitempty"`
-	ID   string          `bson:"id,omitempty"`
-	Name string          `bson:"name,omitempty"`
-	Data json.RawMessage `bson:"data,omitempty"`
-}
-type Activity struct {
-	UID       string          `bson:"uid,omitempty"`
-	ID        string          `bson:"id,omitempty"`
-	StartDate string          `bson:"startDate,omitempty"`
-	EndDate   string          `bson:"endDate,omitempty"`
-	Data      json.RawMessage `bson:"data,omitempty"`
 }
 
 func NewClient(mongoURL, mongoDatabase, collEntity, collAgent, collActivity string) *Client {
@@ -64,16 +42,6 @@ func NewClient(mongoURL, mongoDatabase, collEntity, collAgent, collActivity stri
 			activity: collActivity,
 		},
 	}
-}
-
-func NewEntity() *Entity {
-	return &Entity{}
-}
-func NewAgent() *Agent {
-	return &Agent{}
-}
-func NewActivity() *Activity {
-	return &Activity{}
 }
 
 func (client *Client) EntityUID(id string) string {
@@ -100,31 +68,29 @@ func (client *Client) ActivitytUID(id string) string {
 	return activity.UID
 }
 
-func (client *Client) InsertEntity(entity *Entity) error {
+func (client *Client) InsertEntity(entity *provutil.Entity) error {
 	collection := client.conn.Database(client.database).Collection(client.collections.entity)
 	if collection == nil {
 		return fmt.Errorf("No Collection")
 	}
 
 	payload, _ := bson.Marshal(entity)
-
 	_, err := collection.InsertOne(context.TODO(), payload)
 	return err
 }
 
-func (client *Client) InsertAgent(agent *Agent) error {
+func (client *Client) InsertAgent(agent *provutil.Agent) error {
 	collection := client.conn.Database(client.database).Collection(client.collections.agent)
 	if collection == nil {
 		return fmt.Errorf("No Collection")
 	}
 
 	payload, _ := bson.Marshal(agent)
-
 	_, err := collection.InsertOne(context.TODO(), payload)
 	return err
 }
 
-func (client *Client) InsertActivity(activity *Activity) error {
+func (client *Client) InsertActivity(activity *provutil.Activity) error {
 	collection := client.conn.Database(client.database).Collection(client.collections.activity)
 	if collection == nil {
 		return fmt.Errorf("No Collection")
@@ -136,40 +102,26 @@ func (client *Client) InsertActivity(activity *Activity) error {
 	return err
 }
 
-func (client *Client) FetchEntity(id string) *Entity {
-	/*
-		collection := client.conn.Database(client.database).Collection(client.collections.entity)
-		if collection == nil {
-			return result, fmt.Errorf("No Collection")
-		}
+func (client *Client) FetchEntity(id string) *provutil.Entity {
+	var entity provutil.Entity
+	filter := bson.D{
+		{Key: "attributes.id", Value: id},
+	}
+	result := client.fetch(client.collections.entity, filter)
+	err := result.Decode(&entity.Attributes)
+	if err != nil {
+		return nil
+	}
 
-		err := collection.FindOne(context.TODO(), filter).Decode(&result)
-		if err != nil {
-			return result, err
-		}
-
-		return result, nil
-	*/
-	var result Entity
-	filter := bson.D{{Key: "id", Value: id}}
-	client.fetch(client.collections.entity, filter)
-	return &result
+	return &entity
 }
 
-func (client *Client) FetchAgent(id string) *Agent {
-	/*
-		collection := client.conn.Database(client.database).Collection(client.collections.agent)
-		if collection == nil {
-			return result, fmt.Errorf("No Collection")
-		}
+func (client *Client) FetchAgent(id string) *provutil.Agent {
+	var agent provutil.Agent
+	filter := bson.D{
+		{Key: "attributes.id", Value: id},
+	}
 
-		err := collection.FindOne(context.TODO(), filter).Decode(&result)
-		if err != nil {
-			return result, err
-		}
-	*/
-	var agent Agent
-	filter := bson.D{{Key: "id", Value: id}}
 	result := client.fetch(client.collections.agent, filter)
 	err := result.Decode(&agent)
 	if err != nil {
@@ -179,23 +131,18 @@ func (client *Client) FetchAgent(id string) *Agent {
 	return &agent
 }
 
-func (client *Client) FetchActivity(id string) *Activity {
-	/*
-		collection := client.conn.Database(client.database).Collection(client.collections.activity)
-		if collection == nil {
-			return result, fmt.Errorf("No Collection")
-		}
+func (client *Client) FetchActivity(id string) *provutil.Activity {
+	var activity provutil.Activity
+	filter := bson.D{
+		{Key: "attributes.id", Value: id},
+	}
+	result := client.fetch(client.collections.activity, filter)
+	err := result.Decode(&activity.Attributes)
+	if err != nil {
+		return nil
+	}
 
-		err := collection.FindOne(context.TODO(), filter).Decode(&result)
-		if err != nil {
-			return result, err
-		}
-	*/
-	var result Activity
-	filter := bson.D{{Key: "id", Value: id}}
-	client.fetch(client.collections.activity, filter)
-	return &result
-
+	return &activity
 }
 
 func (client *Client) fetch(collection string, filter bson.D) *mongo.SingleResult {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/provutil"
 	"github.com/dgraph-io/dgo"
 	"github.com/dgraph-io/dgo/protos/api"
 	"google.golang.org/grpc"
@@ -20,11 +21,12 @@ type query struct {
 }
 
 type decode struct {
-	Entity   []Entity   `json:"entity,omitempty"`
-	Agent    []Agent    `json:"agent,omitempty"`
-	Activity []Activity `json:"activity,omitempty"`
+	Entity   []provutil.Entity   `json:"entity,omitempty"`
+	Agent    []provutil.Agent    `json:"agent,omitempty"`
+	Activity []provutil.Activity `json:"activity,omitempty"`
 }
 
+/*
 type Entity struct {
 	UID            string    `json:"uid,omitempty"`
 	ID             string    `json:"id,omitempty"`
@@ -50,6 +52,7 @@ type Agent struct {
 	Name            string `json:"name,omitempty"`
 	ActedOnBehalfOf *Agent `json:"actedOnBehalfOf,omitempty"`
 }
+*/
 
 func NewClient(dgraphURL string) *Client {
 	d, err := grpc.Dial(dgraphURL, grpc.WithInsecure())
@@ -64,30 +67,14 @@ func NewClient(dgraphURL string) *Client {
 	}
 }
 
-func NewEntity() *Entity {
-	return &Entity{
-		UID: "_:entity",
-		WasGeneratedBy: &Activity{
-			UID: "_:activity",
-			WasAssociatedWith: &Agent{
-				UID: "_:agent",
-				ActedOnBehalfOf: &Agent{
-					UID: "_:supervisor",
-				},
-			},
-		},
-	}
-}
+func (c *Client) AddDerivate(derivate *provutil.Entity) (map[string]string, error) {
+	activity := derivate.WasGeneratedBy
+	agent := derivate.WasGeneratedBy.WasAssociatedWith
+	supervisor := derivate.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf
 
-func NewAgent(uid string) *Agent {
-	return &Agent{UID: uid}
-}
+	entityData, activityData, agentData, supervisorData := derivate.Data, activity.Data, agent.Data, supervisor.Data
+	derivate.Data, activity.Data, agent.Data, supervisor.Data = nil, nil, nil, nil
 
-func NewActivity(uid string) *Activity {
-	return &Activity{}
-}
-
-func (c *Client) AddDerivate(derivate *Entity) (map[string]string, error) {
 	payload, err := json.Marshal(derivate)
 	if err != nil {
 		return nil, err
@@ -97,11 +84,12 @@ func (c *Client) AddDerivate(derivate *Entity) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	derivate.Data, activity.Data, agent.Data, supervisor.Data = entityData, activityData, agentData, supervisorData
 
 	return assigned.GetUids(), nil
 }
 
-func (c *Client) QueryParentEntity(id string, revision string) *Entity {
+func (c *Client) QueryParentEntity(id string, revision string) *provutil.Entity {
 	query := query{
 		text: `
 		query entity($id: string, $revision: int){
@@ -121,7 +109,7 @@ func (c *Client) QueryParentEntity(id string, revision string) *Entity {
 	return &decode.Entity[0]
 }
 
-func (c *Client) QueryAgentByName(name string) *Agent {
+func (c *Client) QueryAgentByName(name string) *provutil.Agent {
 	query := query{
 		text: `
 		query agent($name: string){
@@ -141,7 +129,7 @@ func (c *Client) QueryAgentByName(name string) *Agent {
 	return &decode.Agent[0]
 }
 
-func (c *Client) QueryEntityByID(id string) *Entity {
+func (c *Client) QueryEntityByID(id string) *provutil.Entity {
 	query := query{
 		text: `
 		query entity($id: string){
