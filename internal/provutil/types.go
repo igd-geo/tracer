@@ -7,19 +7,22 @@ import (
 type Entity struct {
 	*Attributes
 	*Edges `bson:"-"`
-	Data   json.RawMessage `json:"data,omitempty" bson:"data,omitempty"`
+	Data   json.RawMessage  `json:"data,omitempty" bson:"data,omitempty"`
+	Graph  *json.RawMessage `json:"graph" bson:"-"`
 }
 
 type Activity struct {
 	*Attributes
 	*Edges `bson:"-"`
-	Data   json.RawMessage `json:"data,omitempty" bson:"data,omitempty"`
+	Data   json.RawMessage  `json:"data,omitempty" bson:"data,omitempty"`
+	Graph  *json.RawMessage `json:"graph" bson:"-"`
 }
 
 type Agent struct {
 	*Attributes
 	*Edges `bson:"-"`
-	Data   json.RawMessage `json:"data,omitempty" bson:"data,omitempty"`
+	Data   json.RawMessage  `json:"data,omitempty" bson:"data,omitempty"`
+	Graph  *json.RawMessage `json:"graph" bson:"-"`
 }
 
 type Attributes struct {

@@ -73,7 +73,6 @@ func (tracer *Tracer) handleDelivery(rbDelivery rabbitmq.Delivery) {
 		log.Println(err)
 		return
 	}
-
 }
 
 func (tracer *Tracer) createGraphEntry(entity *provutil.Entity) (bool, bool, error) {

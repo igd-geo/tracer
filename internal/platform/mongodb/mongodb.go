@@ -108,7 +108,7 @@ func (client *Client) FetchEntity(id string) *provutil.Entity {
 		{Key: "attributes.id", Value: id},
 	}
 	result := client.fetch(client.collections.entity, filter)
-	err := result.Decode(&entity.Attributes)
+	err := result.Decode(&entity)
 	if err != nil {
 		return nil
 	}

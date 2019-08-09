@@ -20,39 +20,11 @@ type query struct {
 	variables map[string]string
 }
 
-type decode struct {
+type result struct {
 	Entity   []provutil.Entity   `json:"entity,omitempty"`
 	Agent    []provutil.Agent    `json:"agent,omitempty"`
 	Activity []provutil.Activity `json:"activity,omitempty"`
 }
-
-/*
-type Entity struct {
-	UID            string    `json:"uid,omitempty"`
-	ID             string    `json:"id,omitempty"`
-	URI            string    `json:"uri,omitempty"`
-	Name           string    `json:"name,omitempty"`
-	CreationDate   string    `json:"creationDate,omitempty"`
-	WasDerivedFrom []*Entity `json:"wasDerivedFrom,omitempty"`
-	WasGeneratedBy *Activity `json:"wasGeneratedBy,omitempty"`
-}
-
-type Activity struct {
-	UID               string    `json:"uid,omitempty"`
-	ID                string    `json:"id,omitempty"`
-	StartDate         string    `json:"startDate,omitempty"`
-	EndDate           string    `json:"endDate,omitempty"`
-	WasAssociatedWith *Agent    `json:"wasAssociatedWith,omitempty"`
-	Used              []*Entity `json:"used,omitempty"`
-}
-
-type Agent struct {
-	UID             string `json:"uid,omitempty"`
-	ID              string `json:"id,omitempty"`
-	Name            string `json:"name,omitempty"`
-	ActedOnBehalfOf *Agent `json:"actedOnBehalfOf,omitempty"`
-}
-*/
 
 func NewClient(dgraphURL string) *Client {
 	d, err := grpc.Dial(dgraphURL, grpc.WithInsecure())
@@ -89,77 +61,40 @@ func (c *Client) AddDerivate(derivate *provutil.Entity) (map[string]string, erro
 	return assigned.GetUids(), nil
 }
 
-func (c *Client) QueryParentEntity(id string, revision string) *provutil.Entity {
-	query := query{
-		text: `
-		query entity($id: string, $revision: int){
-			entity(func:eq(id, $id)) @filter(eq(revision, $revision)) {
-				uid
-			}
-		}`,
-		variables: map[string]string{"$id": id, "$revision": revision},
-	}
+func (c *Client) FetchProvenanceGraph(uid string) *json.RawMessage {
+	query := `
+		query entity($id: string) {
+  			entity(func: uid($id)) {
+    			expand(_all_) {
+      				expand(_all_) {
+        				expand(_all_) {
+        					expand(_all_)
+      					}
+      				}
+    			}
+  			}
+		}`
+	variables := map[string]string{"$id": uid}
 
-	var decode decode
-	c.runQuery(&decode, query)
-
-	if len(decode.Entity) == 0 {
+	res, err := c.runQuery(query, variables)
+	if err != nil {
+		log.Println(err)
 		return nil
 	}
-	return &decode.Entity[0]
+
+	return &res
 }
 
-func (c *Client) QueryAgentByName(name string) *provutil.Agent {
-	query := query{
-		text: `
-		query agent($name: string){
-			agent(func:allofterms(name, $name)) {
-				uid
-			}
-		}`,
-		variables: map[string]string{"$name": name},
-	}
-
-	var decode decode
-	c.runQuery(&decode, query)
-
-	if len(decode.Agent) == 0 {
-		return nil
-	}
-	return &decode.Agent[0]
-}
-
-func (c *Client) QueryEntityByID(id string) *provutil.Entity {
-	query := query{
-		text: `
-		query entity($id: string){
-			entity(func:eq(id, $id)) {
-				uid
-			}
-		}`,
-		variables: map[string]string{"$id": id},
-	}
-
-	var decode decode
-	c.runQuery(&decode, query)
-
-	if len(decode.Entity) == 0 {
-		return nil
-	}
-	return &decode.Entity[0]
-}
-
-func (c *Client) runQuery(decode *decode, query query) error {
+func (c *Client) runQuery(query string, variables map[string]string) (json.RawMessage, error) {
 	txn := c.conn.NewTxn()
 	defer txn.Discard(context.Background())
 
-	resp, err := txn.QueryWithVars(context.Background(), query.text, query.variables)
+	resp, err := txn.QueryWithVars(context.Background(), query, variables)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = json.Unmarshal(resp.Json, decode)
-	return nil
+	return resp.Json, nil
 }
 
 func (c *Client) runMutation(payload []byte) (*api.Assigned, error) {
