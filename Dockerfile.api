@@ -6,7 +6,7 @@ RUN mkdir -p /tracer
 WORKDIR /tracer
 
 COPY ./go.mod ./go.sum ./
-RUN go mod download
+RUN GOPROXY=https://proxy.golang.org go mod download
 
 COPY ./ ./
 
