@@ -8,7 +8,7 @@ import (
 )
 
 func resolveQueryEntity(db infoDB, p graphql.ResolveParams) (*provutil.Entity, error) {
-	id, ok := p.Args["ID"].(string)
+	id, ok := p.Args["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf("TODO")
 	}

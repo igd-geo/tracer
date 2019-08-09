@@ -16,17 +16,15 @@ type consumer struct {
 
 type Delivery []byte
 
-func newConsumer(url string, msgChan chan<- Delivery, ctag string) *consumer {
+func newConsumer(conn *amqp.Connection, url string, msgChan chan<- Delivery, ctag string) *consumer {
 	c := &consumer{
-		conn:    nil,
+		conn:    conn,
 		channel: nil,
 		tag:     ctag,
 		done:    make(chan error),
 	}
 	var err error
 
-	c.conn, err = amqp.Dial(url)
-	failOnError(err, "Failed to connect to RabbitMQ")
 	go func() {
 		err := <-c.conn.NotifyClose(make(chan *amqp.Error))
 		if err != nil {
@@ -83,13 +81,9 @@ func newConsumer(url string, msgChan chan<- Delivery, ctag string) *consumer {
 }
 
 func (c *consumer) shutdown() error {
-	log.Println("Shutting Down...")
+	log.Println("Shutting Down Consumer...")
 	if err := c.channel.Cancel(c.tag, true); err != nil {
 		return fmt.Errorf("Consumer cancel failed: %s", err)
-	}
-
-	if err := c.conn.Close(); err != nil {
-		return fmt.Errorf("AMQP connection close error: %s", err)
 	}
 
 	return <-c.done

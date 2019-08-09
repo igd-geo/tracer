@@ -1,1 +1,1 @@
-query={entity(id:""){name}}
+http ':1234/api?query={prov(ID:"new_doc"){Attributes{Name,ID},Graph,Data}}'

@@ -35,10 +35,10 @@ func initGraphQL(graphDB graphDB, infoDB infoDB) graphql.Schema {
 					},
 				},
 				"agent": &graphql.Field{
-					Type:        objectType,
+					Type:        agentType,
 					Description: "Get agent by id",
 					Args: graphql.FieldConfigArgument{
-						"id": &graphql.ArgumentConfig{
+						"ID": &graphql.ArgumentConfig{
 							Type: graphql.String,
 						},
 					},
@@ -47,10 +47,10 @@ func initGraphQL(graphDB graphDB, infoDB infoDB) graphql.Schema {
 					},
 				},
 				"activity": &graphql.Field{
-					Type:        objectType,
+					Type:        activityType,
 					Description: "Get activity by id",
 					Args: graphql.FieldConfigArgument{
-						"id": &graphql.ArgumentConfig{
+						"ID": &graphql.ArgumentConfig{
 							Type: graphql.String,
 						},
 					},

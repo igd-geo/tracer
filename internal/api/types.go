@@ -87,27 +87,6 @@ var attributesType = graphql.NewObject(
 	},
 )
 
-var edgesType = graphql.NewObject(
-	graphql.ObjectConfig{
-		Name:        "Edges",
-		Description: "Edge collection",
-		Fields: graphql.Fields{
-			"WasGeneratedBy": &graphql.Field{},
-		},
-	},
-)
-
-var objectType = graphql.NewObject(
-	graphql.ObjectConfig{
-		Name: "Object",
-		Fields: graphql.Fields{
-			"Attributes": &graphql.Field{
-				Type: attributesType,
-			},
-		},
-	},
-)
-
 var jsonRaw = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "JSON",
 	Description: "Raw JSON Byte Array",

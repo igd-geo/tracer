@@ -1,7 +1,6 @@
 package rabbitmq
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/streadway/amqp"
@@ -16,17 +15,14 @@ type producer struct {
 	routingKey string
 }
 
-func newProducer(url string, exchange string, routingKey string) *producer {
+func newProducer(conn *amqp.Connection, url string, exchange string, routingKey string) *producer {
+	var err error
 	p := &producer{
-		conn:       nil,
+		conn:       conn,
 		channel:    nil,
 		exchange:   exchange,
 		routingKey: routingKey,
 	}
-	var err error
-
-	p.conn, err = amqp.Dial(url)
-	failOnError(err, "Failed to connect to RabbitMQ")
 
 	p.channel, err = p.conn.Channel()
 	failOnError(err, "Failed to open a channel")
@@ -68,12 +64,8 @@ func (p *producer) publish(body string) error {
 }
 
 func (p *producer) shutdown() error {
-	log.Println("Shutting Down...")
+	log.Println("Shutting Down Producer...")
 	p.channel.Close()
-	if err := p.conn.Close(); err != nil {
-		return fmt.Errorf("AMQP connection close error: %s", err)
-	}
-
 	return nil
 }
 
