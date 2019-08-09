@@ -15,3 +15,4 @@
 # vendor/
 
 cmd/tracer/tracer
+cmd/api/api
