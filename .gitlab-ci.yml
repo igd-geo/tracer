@@ -1,0 +1,38 @@
+tracer_image:
+  image: docker:stable
+  stage: build
+  services:
+  - docker:dind
+  variables:
+    UPSTREAM_IMAGE: $CI_REGISTRY/hummer/$CI_PROJECT_NAME
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+
+  before_script:
+  - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+  script:
+  - docker pull $UPSTREAM_IMAGE:latest || true
+  - docker build --cache-from $UPSTREAM_IMAGE:latest --tag $CI_REGISTRY_IMAGE/tracer:$CI_BUILD_REF --tag $CI_REGISTRY_IMAGE/tracer:$CI_COMMIT_REF_NAME --tag $CI_REGISTRY_IMAGE/tracer:latest .
+  - docker push $CI_REGISTRY_IMAGE/tracer:$CI_BUILD_REF
+  - if [ "${CI_COMMIT_REF_NAME}" != "master" ]; then docker push $CI_REGISTRY_IMAGE/tracer:$CI_COMMIT_REF_NAME; fi;
+  - if [ "${CI_COMMIT_REF_NAME}" == "master" ]; then docker push $CI_REGISTRY_IMAGE/tracer:latest; fi;
+
+tracer-api_image:
+  image: docker:stable
+  stage: build
+  services:
+  - docker:dind
+  variables:
+    UPSTREAM_IMAGE: $CI_REGISTRY/hummer/$CI_PROJECT_NAME
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+
+  before_script:
+  - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+  script:
+  - docker pull $UPSTREAM_IMAGE:latest || true
+  - docker build --cache-from $UPSTREAM_IMAGE:latest --tag $CI_REGISTRY_IMAGE/tracer-api:$CI_BUILD_REF --tag $CI_REGISTRY_IMAGE/tracer-api:$CI_COMMIT_REF_NAME --tag $CI_REGISTRY_IMAGE/tracer-api:latest  -f Dockerfile.api .
+  - docker push $CI_REGISTRY_IMAGE/tracer-api:$CI_BUILD_REF
+  - if [ "${CI_COMMIT_REF_NAME}" != "master" ]; then docker push $CI_REGISTRY_IMAGE/tracer-api:$CI_COMMIT_REF_NAME; fi;
+  - if [ "${CI_COMMIT_REF_NAME}" == "master" ]; then docker push $CI_REGISTRY_IMAGE/tracer-api:latest; fi;
+

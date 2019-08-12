@@ -1,0 +1,42 @@
+{
+  "entity": {
+    "id": "new_doc",
+    "uri": "http://new_doc.com",
+    "name": "New Document",
+    "creationDate": "2016-06-19",
+    "data": {
+      "type": "Document",
+      "revision": 2,
+      "description": "...",
+      "author": "Max Mustermann"
+    },
+    "wasGeneratedBy": {
+      "id": "new_activity",
+      "startDate": "2016-06-18",
+      "endDate": "2016-06-19",
+      "data": {
+        "type": "aggregation",
+        "errors": 0,
+        "duration": "12h"
+      },
+      "wasAssociatedWith": {
+        "id": "prozess",
+        "name": "Exhauster",
+        "data": {
+          "type": "Service"
+        },
+        "actedOnBehalfOf": {
+          "id": "mitarbeiter",
+          "name": "Hans",
+          "data": {
+            "type": "Contractor",
+            "adress": "...",
+            "email": "...",
+            "phone": "..."
+          }
+        }
+      },
+      "used": []
+    }
+  }
+}
