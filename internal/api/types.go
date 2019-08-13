@@ -12,13 +12,28 @@ var entityType = graphql.NewObject(
 		Name:        "Entity",
 		Description: "Provenance Entity Object",
 		Fields: graphql.Fields{
-			"Attributes": &graphql.Field{
-				Type: attributesType,
+			"uid": &graphql.Field{
+				Type: graphql.String,
 			},
-			"Data": &graphql.Field{
+			"id": &graphql.Field{
+				Type: graphql.String,
+			},
+			"uri": &graphql.Field{
+				Type: graphql.String,
+			},
+			"type": &graphql.Field{
+				Type: graphql.String,
+			},
+			"name": &graphql.Field{
+				Type: graphql.String,
+			},
+			"creationDate": &graphql.Field{
+				Type: graphql.String,
+			},
+			"data": &graphql.Field{
 				Type: jsonRaw,
 			},
-			"Graph": &graphql.Field{
+			"graph": &graphql.Field{
 				Type: jsonRaw,
 			},
 		},
@@ -27,16 +42,25 @@ var entityType = graphql.NewObject(
 
 var agentType = graphql.NewObject(
 	graphql.ObjectConfig{
-		Name:        "Attributes",
+		Name:        "Agent",
 		Description: "Provenance Agent Object",
 		Fields: graphql.Fields{
-			"Attributes": &graphql.Field{
-				Type: attributesType,
+			"uid": &graphql.Field{
+				Type: graphql.String,
 			},
-			"Data": &graphql.Field{
+			"id": &graphql.Field{
+				Type: graphql.String,
+			},
+			"type": &graphql.Field{
+				Type: graphql.String,
+			},
+			"name": &graphql.Field{
+				Type: graphql.String,
+			},
+			"data": &graphql.Field{
 				Type: jsonRaw,
 			},
-			"Graph": &graphql.Field{
+			"graph": &graphql.Field{
 				Type: jsonRaw,
 			},
 		},
@@ -47,41 +71,29 @@ var activityType = graphql.NewObject(
 		Name:        "Activity",
 		Description: "Provenance Activity Object",
 		Fields: graphql.Fields{
-			"Attributes": &graphql.Field{
-				Type: attributesType,
+			"uid": &graphql.Field{
+				Type: graphql.String,
 			},
-			"Data": &graphql.Field{
+			"id": &graphql.Field{
+				Type: graphql.String,
+			},
+			"type": &graphql.Field{
+				Type: graphql.String,
+			},
+			"name": &graphql.Field{
+				Type: graphql.String,
+			},
+			"startDate": &graphql.Field{
+				Type: graphql.String,
+			},
+			"endDate": &graphql.Field{
+				Type: graphql.String,
+			},
+			"data": &graphql.Field{
 				Type: jsonRaw,
 			},
-			"Graph": &graphql.Field{
+			"graph": &graphql.Field{
 				Type: jsonRaw,
-			},
-		},
-	},
-)
-
-var attributesType = graphql.NewObject(
-	graphql.ObjectConfig{
-		Name:        "Attributes",
-		Description: "Attribute collection",
-		Fields: graphql.Fields{
-			"ID": &graphql.Field{
-				Type: graphql.String,
-			},
-			"URI": &graphql.Field{
-				Type: graphql.String,
-			},
-			"Name": &graphql.Field{
-				Type: graphql.String,
-			},
-			"CreationDate": &graphql.Field{
-				Type: graphql.String,
-			},
-			"StartDate": &graphql.Field{
-				Type: graphql.String,
-			},
-			"EndDate": &graphql.Field{
-				Type: graphql.String,
 			},
 		},
 	},

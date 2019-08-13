@@ -7,34 +7,27 @@ import (
 	"net/http"
 
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/api/config"
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/dgraph"
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/mongodb"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/provutil"
 	"github.com/graphql-go/graphql"
 )
 
 type Server struct {
-	config  *config.Config
-	dgraph  *dgraph.Client
-	mongodb *mongodb.Client
+	config *config.Config
+	provDB provutil.ProvDB
+	infoDB provutil.InfoDB
 }
 
-func NewServer(config *config.Config) *Server {
+func NewServer(config *config.Config, infoDB provutil.InfoDB, provDB provutil.ProvDB) *Server {
 	return &Server{
 		config: config,
-		dgraph: dgraph.NewClient(config.DgraphURL),
-		mongodb: mongodb.NewClient(
-			config.MongoURL,
-			config.MongoDatabase,
-			config.MongoCollectionEntity,
-			config.MongoCollectionAgent,
-			config.MongoCollectionActivity,
-		),
+		infoDB: infoDB,
+		provDB: provDB,
 	}
 }
 
 func (s *Server) Run() {
 
-	schema := initGraphQL(s.dgraph, s.mongodb)
+	schema := initGraphQL(s.infoDB, s.provDB)
 
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		result := executeQuery(r.URL.Query().Get("query"), schema)

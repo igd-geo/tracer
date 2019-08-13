@@ -7,6 +7,8 @@ import (
 
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/api"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/api/config"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/dgraph"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/mongodb"
 )
 
 func main() {
@@ -17,7 +19,16 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	installFlags(config)
 
-	server := api.NewServer(config)
+	infoDB := mongodb.NewClient(
+		config.MongoURL,
+		config.MongoDatabase,
+		config.MongoCollectionEntity,
+		config.MongoCollectionAgent,
+		config.MongoCollectionActivity,
+	)
+	provDB := dgraph.NewClient(config.DgraphURL)
+
+	server := api.NewServer(config, infoDB, provDB)
 	go server.Run()
 
 	<-signalChan

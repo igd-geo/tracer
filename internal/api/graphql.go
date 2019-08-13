@@ -1,23 +1,11 @@
 package api
 
 import (
-	"encoding/json"
-
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/provutil"
 	"github.com/graphql-go/graphql"
 )
 
-type infoDB interface {
-	FetchEntity(id string) *provutil.Entity
-	FetchAgent(id string) *provutil.Agent
-	FetchActivity(id string) *provutil.Activity
-}
-
-type graphDB interface {
-	FetchProvenanceGraph(uid string) *json.RawMessage
-}
-
-func initGraphQL(graphDB graphDB, infoDB infoDB) graphql.Schema {
+func initGraphQL(infoDB provutil.InfoDB, provDB provutil.ProvDB) graphql.Schema {
 	var queryType = graphql.NewObject(
 		graphql.ObjectConfig{
 			Name: "Query",
@@ -26,7 +14,7 @@ func initGraphQL(graphDB graphDB, infoDB infoDB) graphql.Schema {
 					Type:        entityType,
 					Description: "Get entity by id",
 					Args: graphql.FieldConfigArgument{
-						"ID": &graphql.ArgumentConfig{
+						"id": &graphql.ArgumentConfig{
 							Type: graphql.String,
 						},
 					},
@@ -38,7 +26,7 @@ func initGraphQL(graphDB graphDB, infoDB infoDB) graphql.Schema {
 					Type:        agentType,
 					Description: "Get agent by id",
 					Args: graphql.FieldConfigArgument{
-						"ID": &graphql.ArgumentConfig{
+						"id": &graphql.ArgumentConfig{
 							Type: graphql.String,
 						},
 					},
@@ -50,7 +38,7 @@ func initGraphQL(graphDB graphDB, infoDB infoDB) graphql.Schema {
 					Type:        activityType,
 					Description: "Get activity by id",
 					Args: graphql.FieldConfigArgument{
-						"ID": &graphql.ArgumentConfig{
+						"id": &graphql.ArgumentConfig{
 							Type: graphql.String,
 						},
 					},
@@ -62,12 +50,12 @@ func initGraphQL(graphDB graphDB, infoDB infoDB) graphql.Schema {
 					Type:        entityType,
 					Description: "Get provenance info of object",
 					Args: graphql.FieldConfigArgument{
-						"ID": &graphql.ArgumentConfig{
+						"id": &graphql.ArgumentConfig{
 							Type: graphql.String,
 						},
 					},
 					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-						return resolveProvInfo(infoDB, graphDB, p)
+						return resolveProvInfo(infoDB, provDB, p)
 					},
 				},
 			},

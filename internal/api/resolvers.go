@@ -7,37 +7,53 @@ import (
 	"github.com/graphql-go/graphql"
 )
 
-func resolveQueryEntity(db infoDB, p graphql.ResolveParams) (*provutil.Entity, error) {
+func resolveQueryEntity(db provutil.InfoDB, p graphql.ResolveParams) (*provutil.Entity, error) {
 	id, ok := p.Args["id"].(string)
 	if !ok {
-		return nil, fmt.Errorf("TODO")
+		return nil, fmt.Errorf("Field \"id\" not set")
 	}
-	return db.FetchEntity(id), nil
+
+	entity := db.FetchEntity(id)
+	if entity == nil {
+		return nil, fmt.Errorf("Entity %s not found!", id)
+	}
+	return entity, nil
 }
 
-func resolveQueryAgent(db infoDB, p graphql.ResolveParams) (*provutil.Agent, error) {
+func resolveQueryAgent(db provutil.InfoDB, p graphql.ResolveParams) (*provutil.Agent, error) {
 	id, ok := p.Args["id"].(string)
 	if !ok {
-		return nil, fmt.Errorf("TODO")
+		return nil, fmt.Errorf("Field \"id\" not set")
 	}
-	return db.FetchAgent(id), nil
+	agent := db.FetchAgent(id)
+	if agent == nil {
+		return nil, fmt.Errorf("Agent %s not found!", id)
+	}
+	return agent, nil
 }
 
-func resolveQueryActivity(db infoDB, p graphql.ResolveParams) (*provutil.Activity, error) {
+func resolveQueryActivity(db provutil.InfoDB, p graphql.ResolveParams) (*provutil.Activity, error) {
 	id, ok := p.Args["id"].(string)
 	if !ok {
-		return nil, fmt.Errorf("TODO")
+		return nil, fmt.Errorf("Field \"id\" not set")
 	}
-	return db.FetchActivity(id), nil
+	activity := db.FetchActivity(id)
+	if activity == nil {
+		return nil, fmt.Errorf("Activity %s not found!", id)
+	}
+	return activity, nil
 }
 
-func resolveProvInfo(idb infoDB, gdb graphDB, p graphql.ResolveParams) (*provutil.Entity, error) {
-	id, ok := p.Args["ID"].(string)
+func resolveProvInfo(idb provutil.InfoDB, gdb provutil.ProvDB, p graphql.ResolveParams) (*provutil.Entity, error) {
+	id, ok := p.Args["id"].(string)
 	if !ok {
-		return nil, fmt.Errorf("TODO")
+		return nil, fmt.Errorf("Field \"id\" not set")
 	}
 
 	entity := idb.FetchEntity(id)
+	if entity == nil {
+		return nil, fmt.Errorf("Entity %s not found!", id)
+	}
 	entity.Graph = gdb.FetchProvenanceGraph(entity.UID)
 
 	return entity, nil
