@@ -105,7 +105,7 @@ func (client *Client) InsertActivity(activity *provutil.Activity) error {
 func (client *Client) FetchEntity(id string) *provutil.Entity {
 	var entity provutil.Entity
 	filter := bson.D{
-		{Key: "attributes.id", Value: id},
+		{Key: "id", Value: id},
 	}
 	result := client.fetch(client.collections.entity, filter)
 	err := result.Decode(&entity)
@@ -119,7 +119,7 @@ func (client *Client) FetchEntity(id string) *provutil.Entity {
 func (client *Client) FetchAgent(id string) *provutil.Agent {
 	var agent provutil.Agent
 	filter := bson.D{
-		{Key: "attributes.id", Value: id},
+		{Key: "id", Value: id},
 	}
 
 	result := client.fetch(client.collections.agent, filter)
@@ -134,10 +134,10 @@ func (client *Client) FetchAgent(id string) *provutil.Agent {
 func (client *Client) FetchActivity(id string) *provutil.Activity {
 	var activity provutil.Activity
 	filter := bson.D{
-		{Key: "attributes.id", Value: id},
+		{Key: "id", Value: id},
 	}
 	result := client.fetch(client.collections.activity, filter)
-	err := result.Decode(&activity.Attributes)
+	err := result.Decode(&activity)
 	if err != nil {
 		return nil
 	}

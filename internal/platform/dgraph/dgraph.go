@@ -39,7 +39,7 @@ func NewClient(dgraphURL string) *Client {
 	}
 }
 
-func (c *Client) AddDerivate(derivate *provutil.Entity) (map[string]string, error) {
+func (c *Client) InsertDerivate(derivate *provutil.Entity) (map[string]string, error) {
 	activity := derivate.WasGeneratedBy
 	agent := derivate.WasGeneratedBy.WasAssociatedWith
 	supervisor := derivate.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf
@@ -64,15 +64,15 @@ func (c *Client) AddDerivate(derivate *provutil.Entity) (map[string]string, erro
 func (c *Client) FetchProvenanceGraph(uid string) *json.RawMessage {
 	query := `
 		query entity($id: string) {
-  			entity(func: uid($id)) {
-    			expand(_all_) {
-      				expand(_all_) {
-        				expand(_all_) {
-        					expand(_all_)
-      					}
-      				}
-    			}
-  			}
+			entity(func: uid($id)) {
+				expand(_all_) {
+					expand(_all_) {
+						expand(_all_) {
+							expand(_all_)
+						}
+					}
+				}
+			}
 		}`
 	variables := map[string]string{"$id": uid}
 

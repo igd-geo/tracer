@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/provutil"
 	"github.com/streadway/amqp"
 )
 
@@ -13,7 +14,7 @@ type Session struct {
 	conn     *amqp.Connection
 }
 
-func New(url string, msgChan chan<- Delivery, ctag string, exchange string, routingKey string) *Session {
+func New(url string, msgChan chan<- *provutil.Entity, ctag string, exchange string, routingKey string) *Session {
 	conn, err := amqp.Dial(url)
 	failOnError(err, "Failed to connect to RabbitMQ")
 	return &Session{

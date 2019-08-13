@@ -1,9 +1,11 @@
 package rabbitmq
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/provutil"
 	"github.com/streadway/amqp"
 )
 
@@ -14,9 +16,7 @@ type consumer struct {
 	done    chan error
 }
 
-type Delivery []byte
-
-func newConsumer(conn *amqp.Connection, url string, msgChan chan<- Delivery, ctag string) *consumer {
+func newConsumer(conn *amqp.Connection, url string, msgChan chan<- *provutil.Entity, ctag string) *consumer {
 	c := &consumer{
 		conn:    conn,
 		channel: nil,
@@ -89,9 +89,19 @@ func (c *consumer) shutdown() error {
 	return <-c.done
 }
 
-func handle(deliveries <-chan amqp.Delivery, ch chan<- Delivery, done chan error) {
+func handle(deliveries <-chan amqp.Delivery, ch chan<- *provutil.Entity, done chan error) {
 	for d := range deliveries {
-		ch <- Delivery(d.Body)
+		delivery := struct {
+			Derivate *provutil.Entity `json:"entity,omitempty"`
+		}{
+			Derivate: provutil.NewEntity(),
+		}
+		err := json.Unmarshal(d.Body, &delivery)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		ch <- delivery.Derivate
 	}
 	done <- nil
 }
