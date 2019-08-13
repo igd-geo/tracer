@@ -5,46 +5,34 @@ import (
 	"encoding/json"
 	"log"
 
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/dgraph"
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/mongodb"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/rabbitmq"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/provutil"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/tracer/config"
 )
 
 type Tracer struct {
-	deliveries <-chan rabbitmq.Delivery
+	deliveries <-chan *provutil.Entity
 	rbSession  *rabbitmq.Session
-	mongoDB    *mongodb.Client
-	dgraph     *dgraph.Client
+	infoDB     provutil.InfoDB
+	provDB     provutil.ProvDB
 	config     *config.Config
 }
 
-type Delivery struct {
-	Entity *provutil.Entity `json:"entity,omitempty"`
-}
-
-func New(config *config.Config) *Tracer {
-	msgChan := make(chan rabbitmq.Delivery)
+func New(config *config.Config, infoDB provutil.InfoDB, provDB provutil.ProvDB) *Tracer {
+	msgChan := make(chan *provutil.Entity)
 	tracer := Tracer{
 		deliveries: msgChan,
 		rbSession:  rabbitmq.New(config.RabbitURL, msgChan, config.ConsumerTag, "notifications", "topic"),
-		mongoDB: mongodb.NewClient(
-			config.MongoURL,
-			config.MongoDatabase,
-			config.MongoCollectionEntity,
-			config.MongoCollectionAgent,
-			config.MongoCollectionActivity,
-		),
-		dgraph: dgraph.NewClient(config.DgraphURL),
+		infoDB:     infoDB,
+		provDB:     provDB,
 	}
 	return &tracer
 }
 
 func (tracer *Tracer) Listen() {
 	go func() {
-		for delivery := range tracer.deliveries {
-			go tracer.handleDelivery(delivery)
+		for derivate := range tracer.deliveries {
+			go tracer.handleDelivery(derivate)
 		}
 	}()
 }
@@ -53,29 +41,21 @@ func (tracer *Tracer) Cleanup() error {
 	return tracer.rbSession.Shutdown()
 }
 
-func (tracer *Tracer) handleDelivery(rbDelivery rabbitmq.Delivery) {
-	delivery := Delivery{Entity: provutil.NewEntity()}
-
-	err := json.Unmarshal(rbDelivery, &delivery)
+func (tracer *Tracer) handleDelivery(derivate *provutil.Entity) {
+	createAgent, createSupervisor, err := tracer.createProvEntry(derivate)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	createAgent, createSupervisor, err := tracer.createGraphEntry(delivery.Entity)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	err = tracer.createMongoEntries(delivery.Entity, createAgent, createSupervisor)
+	err = tracer.createInfoEntries(derivate, createAgent, createSupervisor)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 }
 
-func (tracer *Tracer) createGraphEntry(entity *provutil.Entity) (bool, bool, error) {
+func (tracer *Tracer) createProvEntry(entity *provutil.Entity) (bool, bool, error) {
 	var err error
 	createAgent, createSupevisor := false, false
 
@@ -87,7 +67,7 @@ func (tracer *Tracer) createGraphEntry(entity *provutil.Entity) (bool, bool, err
 		return createAgent, createSupevisor, err
 	}
 
-	assigned, err := tracer.dgraph.AddDerivate(entity)
+	assigned, err := tracer.provDB.InsertDerivate(entity)
 	if err != nil {
 		return createAgent, createSupevisor, err
 	}
@@ -112,9 +92,8 @@ func (tracer *Tracer) fetchUsedEntities(entity *provutil.Entity) error {
 	numEntities := len(entity.WasGeneratedBy.Used)
 	if numEntities > 0 {
 		for i, used := range entity.WasGeneratedBy.Used {
-			usedUID := tracer.mongoDB.EntityUID(used.ID)
+			usedUID := tracer.infoDB.EntityUID(used.ID)
 			if usedUID != "" {
-				entity.WasGeneratedBy.Used[i].Attributes = provutil.NewAttributes()
 				entity.WasGeneratedBy.Used[i].UID = usedUID
 			}
 		}
@@ -129,44 +108,42 @@ func (tracer *Tracer) fetchAgents(entity *provutil.Entity) (bool, bool, error) {
 	var err error
 	createAgent, createSupevisor := true, true
 
-	agentUID := tracer.mongoDB.AgentUID(entity.WasGeneratedBy.WasAssociatedWith.ID)
+	agentUID := tracer.infoDB.AgentUID(entity.WasGeneratedBy.WasAssociatedWith.ID)
 
 	if agentUID != "" {
-		entity.WasGeneratedBy.WasAssociatedWith.Attributes = provutil.NewAttributes()
 		entity.WasGeneratedBy.WasAssociatedWith.UID = agentUID
 		createAgent = false
 	}
 
-	supervisorUID := tracer.mongoDB.AgentUID(entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID)
+	supervisorUID := tracer.infoDB.AgentUID(entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID)
 
 	if supervisorUID != "" {
-		entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.Attributes = provutil.NewAttributes()
 		entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = supervisorUID
 		createSupevisor = false
 	}
 	return createAgent, createSupevisor, err
 }
 
-func (tracer *Tracer) createMongoEntries(entity *provutil.Entity, createAgent bool, createSupevisor bool) error {
-	err := tracer.createMongoEntity(entity)
+func (tracer *Tracer) createInfoEntries(entity *provutil.Entity, createAgent bool, createSupevisor bool) error {
+	err := tracer.addEntity(entity)
 	if err != nil {
 		return err
 	}
 
-	err = tracer.createMongoActivity(entity)
+	err = tracer.addActivity(entity)
 	if err != nil {
 		return err
 	}
 
 	if createAgent {
-		tracer.createMongoAgent(entity, false)
+		tracer.addAgent(entity, false)
 		if err != nil {
 			return err
 		}
 	}
 
 	if createSupevisor {
-		tracer.createMongoAgent(entity, true)
+		tracer.addAgent(entity, true)
 		if err != nil {
 			return err
 		}
@@ -176,7 +153,7 @@ func (tracer *Tracer) createMongoEntries(entity *provutil.Entity, createAgent bo
 	return nil
 }
 
-func (tracer *Tracer) createMongoEntity(entity *provutil.Entity) error {
+func (tracer *Tracer) addEntity(entity *provutil.Entity) error {
 	var buffer bytes.Buffer
 	err := json.Compact(&buffer, entity.Data)
 
@@ -185,10 +162,10 @@ func (tracer *Tracer) createMongoEntity(entity *provutil.Entity) error {
 	}
 
 	entity.Data = buffer.Bytes()
-	return tracer.mongoDB.InsertEntity(entity)
+	return tracer.infoDB.InsertEntity(entity)
 }
 
-func (tracer *Tracer) createMongoAgent(entity *provutil.Entity, isSupervisor bool) error {
+func (tracer *Tracer) addAgent(entity *provutil.Entity, isSupervisor bool) error {
 	var agent *provutil.Agent
 	var buffer bytes.Buffer
 
@@ -205,10 +182,10 @@ func (tracer *Tracer) createMongoAgent(entity *provutil.Entity, isSupervisor boo
 
 	agent.Data = buffer.Bytes()
 
-	return tracer.mongoDB.InsertAgent(agent)
+	return tracer.infoDB.InsertAgent(agent)
 }
 
-func (tracer *Tracer) createMongoActivity(entity *provutil.Entity) error {
+func (tracer *Tracer) addActivity(entity *provutil.Entity) error {
 	var buffer bytes.Buffer
 	err := json.Compact(&buffer, entity.WasGeneratedBy.Data)
 
@@ -217,5 +194,5 @@ func (tracer *Tracer) createMongoActivity(entity *provutil.Entity) error {
 	}
 
 	entity.WasGeneratedBy.Data = buffer.Bytes()
-	return tracer.mongoDB.InsertActivity(entity.WasGeneratedBy)
+	return tracer.infoDB.InsertActivity(entity.WasGeneratedBy)
 }
