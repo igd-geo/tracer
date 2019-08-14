@@ -42,59 +42,73 @@ func (tracer *Tracer) Cleanup() error {
 }
 
 func (tracer *Tracer) handleDelivery(derivate *provutil.Entity) {
-	createAgent, createSupervisor, err := tracer.createProvEntry(derivate)
+	activityExists, agentExists, supervisorExists, err := tracer.createProvEntry(derivate)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	err = tracer.createInfoEntries(derivate, createAgent, createSupervisor)
+	err = tracer.createInfoEntries(derivate, activityExists, agentExists, supervisorExists)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 }
 
-func (tracer *Tracer) createProvEntry(entity *provutil.Entity) (bool, bool, error) {
+func (tracer *Tracer) createProvEntry(entity *provutil.Entity) (bool, bool, bool, error) {
 	var err error
-	createAgent, createSupevisor := false, false
+	activityExists, agentExists, supervisorExists := false, false, false
 
-	if err := tracer.fetchUsedEntities(entity); err != nil {
-		return createAgent, createSupevisor, err
+	if entity.WasGeneratedBy.IsBatch {
+		activityExists = tracer.fetchActivityUID(entity.WasGeneratedBy)
 	}
 
-	if createAgent, createSupevisor, err = tracer.fetchAgents(entity); err != nil {
-		return createAgent, createSupevisor, err
+	if err := tracer.fetchUsedEntities(entity); err != nil {
+		return activityExists, agentExists, supervisorExists, err
+	}
+
+	if err := tracer.fetchOriginalEntities(entity); err != nil {
+		return activityExists, agentExists, supervisorExists, err
+	}
+
+	if agentExists, supervisorExists, err = tracer.fetchAgents(entity); err != nil {
+		return activityExists, agentExists, supervisorExists, err
 	}
 
 	assigned, err := tracer.provDB.InsertDerivate(entity)
 	if err != nil {
-		return createAgent, createSupevisor, err
+		return activityExists, agentExists, supervisorExists, err
 	}
 
-	log.Printf("inserted dgraph entries as %v\n", assigned)
+	log.Printf("created provenance entries as %v\n", assigned)
 
 	entity.UID = assigned["entity"]
-	entity.WasGeneratedBy.UID = assigned["activity"]
-	if createAgent {
+
+	if !activityExists {
+		entity.WasGeneratedBy.UID = assigned["activity"]
+		log.Printf("activity <%s> not in database, creating entry\n", entity.WasGeneratedBy.ID)
+	}
+
+	if !agentExists {
 		entity.WasGeneratedBy.WasAssociatedWith.UID = assigned["agent"]
 		log.Printf("agent <%s> not in database, creating entry\n", entity.WasGeneratedBy.WasAssociatedWith.ID)
 	}
-	if createSupevisor {
+
+	if !supervisorExists {
 		entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = assigned["supervisor"]
-		log.Printf("agent <%s> not in database, creating entry\n", entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID)
+		log.Printf("agent(supervisor) <%s> not in database, creating entry\n", entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID)
 	}
 
-	return createAgent, createSupevisor, err
+	return activityExists, agentExists, supervisorExists, err
 }
 
 func (tracer *Tracer) fetchUsedEntities(entity *provutil.Entity) error {
 	numEntities := len(entity.WasGeneratedBy.Used)
 	if numEntities > 0 {
-		for i, used := range entity.WasGeneratedBy.Used {
-			usedUID := tracer.infoDB.EntityUID(used.ID)
-			if usedUID != "" {
-				entity.WasGeneratedBy.Used[i].UID = usedUID
+		for i, e := range entity.WasGeneratedBy.Used {
+			uid := tracer.infoDB.EntityUID(e.ID)
+			if uid != "" {
+				entity.WasGeneratedBy.Used[i].UID = uid
 			}
 		}
 		log.Println("fetched uids of used entities")
@@ -104,45 +118,73 @@ func (tracer *Tracer) fetchUsedEntities(entity *provutil.Entity) error {
 	return nil
 }
 
+func (tracer *Tracer) fetchOriginalEntities(entity *provutil.Entity) error {
+	numEntities := len(entity.WasDerivedFrom)
+	if numEntities > 0 {
+		for i, e := range entity.WasDerivedFrom {
+			uid := tracer.infoDB.EntityUID(e.ID)
+			if uid != "" {
+				entity.WasDerivedFrom[i].UID = uid
+			}
+		}
+		log.Println("fetched uids of related entities")
+	} else {
+		log.Println("entity has no related entities to fetch, skipping")
+	}
+	return nil
+}
+
 func (tracer *Tracer) fetchAgents(entity *provutil.Entity) (bool, bool, error) {
 	var err error
-	createAgent, createSupevisor := true, true
+	agentExists, supervisorExists := false, false
 
 	agentUID := tracer.infoDB.AgentUID(entity.WasGeneratedBy.WasAssociatedWith.ID)
 
 	if agentUID != "" {
 		entity.WasGeneratedBy.WasAssociatedWith.UID = agentUID
-		createAgent = false
+		agentExists = true
 	}
 
 	supervisorUID := tracer.infoDB.AgentUID(entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID)
 
 	if supervisorUID != "" {
 		entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = supervisorUID
-		createSupevisor = false
+		supervisorExists = true
 	}
-	return createAgent, createSupevisor, err
+	return agentExists, supervisorExists, err
 }
 
-func (tracer *Tracer) createInfoEntries(entity *provutil.Entity, createAgent bool, createSupevisor bool) error {
+func (tracer *Tracer) fetchActivityUID(activity *provutil.Activity) bool {
+	activityExists := false
+	uid := tracer.infoDB.ActivitytUID(activity.ID)
+	if uid != "" {
+		activity.UID = uid
+		activityExists = true
+	}
+	return activityExists
+}
+
+func (tracer *Tracer) createInfoEntries(entity *provutil.Entity, activityExists bool, agentExists bool, supervisorExists bool) error {
 	err := tracer.addEntity(entity)
 	if err != nil {
 		return err
 	}
 
-	err = tracer.addActivity(entity)
-	if err != nil {
-		return err
+	if !activityExists {
+		err = tracer.addActivity(entity)
+		if err != nil {
+			return err
+		}
 	}
 
-	if createAgent {
+	if !agentExists {
 		tracer.addAgent(entity, false)
 		if err != nil {
 			return err
 		}
 	}
 
-	if createSupevisor {
+	if !supervisorExists {
 		tracer.addAgent(entity, true)
 		if err != nil {
 			return err

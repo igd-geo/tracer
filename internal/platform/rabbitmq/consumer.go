@@ -99,7 +99,7 @@ func handle(deliveries <-chan amqp.Delivery, ch chan<- *provutil.Entity, done ch
 		err := json.Unmarshal(d.Body, &delivery)
 		if err != nil {
 			log.Println(err)
-			return
+			continue
 		}
 		ch <- delivery.Derivate
 	}

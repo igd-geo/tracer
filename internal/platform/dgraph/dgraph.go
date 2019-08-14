@@ -61,7 +61,7 @@ func (c *Client) InsertDerivate(derivate *provutil.Entity) (map[string]string, e
 	return assigned.GetUids(), nil
 }
 
-func (c *Client) FetchProvenanceGraph(uid string) *json.RawMessage {
+func (c *Client) FetchProvenanceGraph(uid string) json.RawMessage {
 	query := `
 		query entity($id: string) {
 			entity(func: uid($id)) {
@@ -82,7 +82,7 @@ func (c *Client) FetchProvenanceGraph(uid string) *json.RawMessage {
 		return nil
 	}
 
-	return &res
+	return res
 }
 
 func (c *Client) runQuery(query string, variables map[string]string) (json.RawMessage, error) {

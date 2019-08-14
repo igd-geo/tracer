@@ -16,5 +16,5 @@ type InfoDB interface {
 
 type ProvDB interface {
 	InsertDerivate(derivate *Entity) (map[string]string, error)
-	FetchProvenanceGraph(uid string) *json.RawMessage
+	FetchProvenanceGraph(uid string) json.RawMessage
 }
