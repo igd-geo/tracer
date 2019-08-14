@@ -1,21 +1,27 @@
 {
   "entity": {
-    "id": "1234",
+    "id": "55",
     "uri": "http://new_doc.com",
     "name": "Some Document",
     "creationDate": "2016-06-19",
     "type": "document",
+    "wasDerivedFrom": [
+      {
+        "id": "2"
+      }
+    ],
     "data": {
       "revision": 2,
       "description": "...",
       "author": "Max Mustermann"
     },
     "wasGeneratedBy": {
-      "id": "5678",
+      "id": "blablabla",
       "name": "Some Activity",
       "startDate": "2016-06-18",
       "endDate": "2016-06-19",
-      "type": "batch",
+      "type": "aggregation",
+      "isBatch": true,
       "data": {
         "errors": 0,
         "duration": "12h"
@@ -36,7 +42,11 @@
           }
         }
       },
-      "used": []
+      "used": [
+        {
+          "id": "1"
+        }
+      ]
     }
   }
 }
