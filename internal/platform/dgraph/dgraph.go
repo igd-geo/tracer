@@ -26,8 +26,8 @@ type result struct {
 	Activity []provutil.Activity `json:"activity,omitempty"`
 }
 
-func NewClient(dgraphURL string) *Client {
-	d, err := grpc.Dial(dgraphURL, grpc.WithInsecure())
+func NewClient(url string) *Client {
+	d, err := grpc.Dial(url, grpc.WithInsecure())
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -19,14 +19,8 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	installFlags(config)
 
-	infoDB := mongodb.NewClient(
-		config.MongoURL,
-		config.MongoDatabase,
-		config.MongoCollectionEntity,
-		config.MongoCollectionAgent,
-		config.MongoCollectionActivity,
-	)
-	provDB := dgraph.NewClient(config.DgraphURL)
+	infoDB := mongodb.NewClient(config.InfoDB)
+	provDB := dgraph.NewClient(config.ProvDB)
 
 	tracer := tracer.New(config, infoDB, provDB)
 	tracer.Listen()
