@@ -26,8 +26,8 @@ type result struct {
 	Activity []provutil.Activity `json:"activity,omitempty"`
 }
 
-func NewClient(dgraphURL string) *Client {
-	d, err := grpc.Dial(dgraphURL, grpc.WithInsecure())
+func NewClient(url string) *Client {
+	d, err := grpc.Dial(url, grpc.WithInsecure())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func NewClient(dgraphURL string) *Client {
 	}
 }
 
-func (c *Client) AddDerivate(derivate *provutil.Entity) (map[string]string, error) {
+func (c *Client) InsertDerivate(derivate *provutil.Entity) (map[string]string, error) {
 	activity := derivate.WasGeneratedBy
 	agent := derivate.WasGeneratedBy.WasAssociatedWith
 	supervisor := derivate.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf
@@ -64,15 +64,15 @@ func (c *Client) AddDerivate(derivate *provutil.Entity) (map[string]string, erro
 func (c *Client) FetchProvenanceGraph(uid string) *json.RawMessage {
 	query := `
 		query entity($id: string) {
-  			entity(func: uid($id)) {
-    			expand(_all_) {
-      				expand(_all_) {
-        				expand(_all_) {
-        					expand(_all_)
-      					}
-      				}
-    			}
-  			}
+			entity(func: uid($id)) {
+				expand(_all_) {
+					expand(_all_) {
+						expand(_all_) {
+							expand(_all_)
+						}
+					}
+				}
+			}
 		}`
 	variables := map[string]string{"$id": uid}
 

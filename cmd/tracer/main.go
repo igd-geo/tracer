@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/signal"
 
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/dgraph"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/mongodb"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/tracer"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/tracer/config"
 )
@@ -17,7 +19,10 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	installFlags(config)
 
-	tracer := tracer.New(config)
+	infoDB := mongodb.NewClient(config.InfoDB)
+	provDB := dgraph.NewClient(config.ProvDB)
+
+	tracer := tracer.New(config, infoDB, provDB)
 	tracer.Listen()
 
 	<-signalChan

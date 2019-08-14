@@ -12,6 +12,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const (
+	databaseName       = "tracer"
+	collectionEntity   = "entity"
+	collectionAgent    = "agent"
+	collectionActivity = "activity"
+)
+
 type Client struct {
 	conn        *mongo.Client
 	database    string
@@ -24,22 +31,22 @@ type collections struct {
 	activity string
 }
 
-func NewClient(mongoURL, mongoDatabase, collEntity, collAgent, collActivity string) *Client {
+func NewClient(url string) *Client {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURL))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(url))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	return &Client{
 		conn:     client,
-		database: mongoDatabase,
+		database: databaseName,
 		collections: collections{
-			entity:   collEntity,
-			agent:    collAgent,
-			activity: collActivity,
+			entity:   collectionEntity,
+			agent:    collectionAgent,
+			activity: collectionActivity,
 		},
 	}
 }
@@ -105,7 +112,7 @@ func (client *Client) InsertActivity(activity *provutil.Activity) error {
 func (client *Client) FetchEntity(id string) *provutil.Entity {
 	var entity provutil.Entity
 	filter := bson.D{
-		{Key: "attributes.id", Value: id},
+		{Key: "id", Value: id},
 	}
 	result := client.fetch(client.collections.entity, filter)
 	err := result.Decode(&entity)
@@ -119,7 +126,7 @@ func (client *Client) FetchEntity(id string) *provutil.Entity {
 func (client *Client) FetchAgent(id string) *provutil.Agent {
 	var agent provutil.Agent
 	filter := bson.D{
-		{Key: "attributes.id", Value: id},
+		{Key: "id", Value: id},
 	}
 
 	result := client.fetch(client.collections.agent, filter)
@@ -134,10 +141,10 @@ func (client *Client) FetchAgent(id string) *provutil.Agent {
 func (client *Client) FetchActivity(id string) *provutil.Activity {
 	var activity provutil.Activity
 	filter := bson.D{
-		{Key: "attributes.id", Value: id},
+		{Key: "id", Value: id},
 	}
 	result := client.fetch(client.collections.activity, filter)
-	err := result.Decode(&activity.Attributes)
+	err := result.Decode(&activity)
 	if err != nil {
 		return nil
 	}
