@@ -3,58 +3,92 @@ package api
 import (
 	"fmt"
 
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/provutil"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/db"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/util"
 	"github.com/graphql-go/graphql"
 )
 
-func resolveQueryEntity(db provutil.InfoDB, p graphql.ResolveParams) (*provutil.Entity, error) {
+func resolveQueryEntity(dbClient *db.Client, p graphql.ResolveParams) (*util.Entity, error) {
 	id, ok := p.Args["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf(`Field "id" not set`)
 	}
 
-	entity := db.FetchEntity(id)
-	if entity == nil {
+	query := db.NewQuery(db.QueryEntityUIDByID)
+	query.SetVariable(db.VariableEntityID, id)
+	fmt.Printf("%+v", query)
+
+	res, err := dbClient.RunQueryWithVars(query)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res.Entity) != 1 {
 		return nil, fmt.Errorf("Entity %s not found", id)
 	}
-	return entity, nil
+
+	return res.Entity[0], nil
 }
 
-func resolveQueryAgent(db provutil.InfoDB, p graphql.ResolveParams) (*provutil.Agent, error) {
+func resolveQueryAgent(dbClient *db.Client, p graphql.ResolveParams) (*util.Agent, error) {
 	id, ok := p.Args["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf(`Field "id" not set`)
 	}
-	agent := db.FetchAgent(id)
-	if agent == nil {
+
+	query := db.NewQuery(db.QueryAgentUIDByID)
+	query.SetVariable(db.VariableAgentID, id)
+
+	res, err := dbClient.RunQueryWithVars(query)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res.Agent) != 1 {
 		return nil, fmt.Errorf("Agent %s not found", id)
 	}
-	return agent, nil
+
+	return res.Agent[0], nil
 }
 
-func resolveQueryActivity(db provutil.InfoDB, p graphql.ResolveParams) (*provutil.Activity, error) {
+func resolveQueryActivity(dbClient *db.Client, p graphql.ResolveParams) (*util.Activity, error) {
 	id, ok := p.Args["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf(`Field "id" not set`)
 	}
-	activity := db.FetchActivity(id)
-	if activity == nil {
+
+	query := db.NewQuery(db.QueryActivityUIDByID)
+	query.SetVariable(db.VariableActivityID, id)
+
+	res, err := dbClient.RunQueryWithVars(query)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res.Activity) != 1 {
 		return nil, fmt.Errorf("Activity %s not found", id)
 	}
-	return activity, nil
+
+	return res.Activity[0], nil
 }
 
-func resolveProvInfo(idb provutil.InfoDB, gdb provutil.ProvDB, p graphql.ResolveParams) (*provutil.Entity, error) {
+func resolveProvGraph(dbClient *db.Client, p graphql.ResolveParams) (*util.Graph, error) {
 	id, ok := p.Args["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf(`Field "id" not set`)
 	}
 
-	entity := idb.FetchEntity(id)
-	if entity == nil {
-		return nil, fmt.Errorf("Entity %s not found", id)
-	}
-	entity.Graph = gdb.FetchProvenanceGraph(entity.UID)
+	query := db.NewQuery(db.QueryProvenanceGraph)
+	query.SetVariable(db.VariableGraphRootID, id)
 
-	return entity, nil
+	res, err := dbClient.RunQueryWithVars(query)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res.Graph) != 1 {
+		return nil, fmt.Errorf("%s is no valid graph root", id)
+	}
+
+	return res.Graph[0], nil
 }

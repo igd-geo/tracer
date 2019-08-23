@@ -16,3 +16,5 @@
 
 cmd/tracer/tracer
 cmd/api/api
+cmd/spammer/spammer
+cmd/spammer/*

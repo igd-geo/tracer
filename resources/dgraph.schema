@@ -1,14 +1,11 @@
 <actedOnBehalfOf>: uid .
 <creationDate>: string .
-<dgraph.group.acl>: string .
-<dgraph.password>: password .
-<dgraph.user.group>: uid @reverse .
-<dgraph.xid>: string @index(exact) .
 <endDate>: string .
-<id>: string @index(hash) .
-<name>: string @index(term) .
-<startDate>: string @index(term) .
-<uri>: string @index(hash) .
+<id>: string @index(exact) @upsert .
+<name>: string .
+<startDate>: string .
+<test>: string .
+<type>: string .
+<uri>: string .
 <wasAssociatedWith>: uid .
 <wasGeneratedBy>: uid .
-

@@ -5,24 +5,27 @@ import (
 	"os"
 	"os/signal"
 
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/dgraph"
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/mongodb"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/broker"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/db"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/tracer"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/tracer/config"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/util"
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
 
 	config := config.New()
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	installFlags(config)
+	config.InstallFlags()
 
-	infoDB := mongodb.NewClient(config.InfoDB)
-	provDB := dgraph.NewClient(config.ProvDB)
+	deliveries := make(chan *util.Entity)
+	broker := broker.New(config.Broker, deliveries, config.ConsumerTag, "notifications", "topic")
+	db := db.NewClient(config.DB)
 
-	tracer := tracer.New(config, infoDB, provDB)
+	tracer := tracer.Setup(config, db, broker, deliveries)
 	tracer.Listen()
 
 	<-signalChan

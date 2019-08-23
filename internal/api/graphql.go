@@ -1,11 +1,11 @@
 package api
 
 import (
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/provutil"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/db"
 	"github.com/graphql-go/graphql"
 )
 
-func initGraphQL(infoDB provutil.InfoDB, provDB provutil.ProvDB) graphql.Schema {
+func initGraphQL(db *db.Client) graphql.Schema {
 	var queryType = graphql.NewObject(
 		graphql.ObjectConfig{
 			Name: "Query",
@@ -19,7 +19,7 @@ func initGraphQL(infoDB provutil.InfoDB, provDB provutil.ProvDB) graphql.Schema 
 						},
 					},
 					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-						return resolveQueryEntity(infoDB, p)
+						return resolveQueryEntity(db, p)
 					},
 				},
 				"agent": &graphql.Field{
@@ -31,7 +31,7 @@ func initGraphQL(infoDB provutil.InfoDB, provDB provutil.ProvDB) graphql.Schema 
 						},
 					},
 					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-						return resolveQueryAgent(infoDB, p)
+						return resolveQueryAgent(db, p)
 					},
 				},
 				"activity": &graphql.Field{
@@ -43,19 +43,19 @@ func initGraphQL(infoDB provutil.InfoDB, provDB provutil.ProvDB) graphql.Schema 
 						},
 					},
 					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-						return resolveQueryActivity(infoDB, p)
+						return resolveQueryActivity(db, p)
 					},
 				},
-				"prov": &graphql.Field{
-					Type:        entityType,
-					Description: "Get provenance info of object",
+				"graph": &graphql.Field{
+					Type:        graphType,
+					Description: "Get provenance graph of object",
 					Args: graphql.FieldConfigArgument{
 						"id": &graphql.ArgumentConfig{
 							Type: graphql.String,
 						},
 					},
 					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-						return resolveProvInfo(infoDB, provDB, p)
+						return resolveProvGraph(db, p)
 					},
 				},
 			},

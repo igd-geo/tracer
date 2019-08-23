@@ -1,13 +1,18 @@
-package rabbitmq
+package broker
 
 import (
 	"encoding/json"
 	"fmt"
 	"log"
 
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/provutil"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/util"
 	"github.com/streadway/amqp"
 )
+
+// Delivery is a custom wrapper for RabbitMQ deliveries
+type Delivery struct {
+	Derivative *util.Entity `json:"entity,omitempty"`
+}
 
 type consumer struct {
 	conn    *amqp.Connection
@@ -16,7 +21,7 @@ type consumer struct {
 	done    chan error
 }
 
-func newConsumer(conn *amqp.Connection, url string, msgChan chan<- *provutil.Entity, ctag string) *consumer {
+func newConsumer(conn *amqp.Connection, url string, msgChan chan<- *util.Entity, ctag string) *consumer {
 	c := &consumer{
 		conn:    conn,
 		channel: nil,
@@ -89,19 +94,17 @@ func (c *consumer) shutdown() error {
 	return <-c.done
 }
 
-func handle(deliveries <-chan amqp.Delivery, ch chan<- *provutil.Entity, done chan error) {
+func handle(deliveries <-chan amqp.Delivery, ch chan<- *util.Entity, done chan error) {
 	for d := range deliveries {
-		delivery := struct {
-			Derivate *provutil.Entity `json:"entity,omitempty"`
-		}{
-			Derivate: provutil.NewEntity(),
+		delivery := Delivery{
+			Derivative: util.NewEntity(),
 		}
 		err := json.Unmarshal(d.Body, &delivery)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		ch <- delivery.Derivate
+		ch <- delivery.Derivative
 	}
 	done <- nil
 }

@@ -1,240 +1,205 @@
 package tracer
 
 import (
-	"bytes"
-	"encoding/json"
+	"fmt"
 	"log"
+	"time"
 
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/rabbitmq"
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/provutil"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/broker"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/db"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/tracer/config"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/util"
 )
 
+const transactionSizeLimit = 2000
+const timerDuration = 100 * time.Millisecond
+
+// Tracer is a provenance service.
 type Tracer struct {
-	deliveries <-chan *provutil.Entity
-	rbSession  *rabbitmq.Session
-	infoDB     provutil.InfoDB
-	provDB     provutil.ProvDB
+	deliveries <-chan *util.Entity
+	rbSession  *broker.Session
+	db         *db.Client
 	config     *config.Config
+	cache      cache
 }
 
-func New(config *config.Config, infoDB provutil.InfoDB, provDB provutil.ProvDB) *Tracer {
-	msgChan := make(chan *provutil.Entity)
+type mutation struct {
+	entities []*util.Entity
+}
+
+type cache struct {
+	items map[string]string
+}
+
+// Setup sets up the tracer service and initializes all required components
+func Setup(config *config.Config, db *db.Client, broker *broker.Session, deliveries chan *util.Entity) *Tracer {
 	tracer := Tracer{
-		deliveries: msgChan,
-		rbSession:  rabbitmq.New(config.RabbitURL, msgChan, config.ConsumerTag, "notifications", "topic"),
-		infoDB:     infoDB,
-		provDB:     provDB,
+		deliveries: deliveries,
+		rbSession:  broker,
+		db:         db,
+		cache: cache{
+			items: make(map[string]string),
+		},
 	}
 	return &tracer
 }
 
-func (tracer *Tracer) Listen() {
-	go func() {
-		for derivate := range tracer.deliveries {
-			go tracer.handleDelivery(derivate)
-		}
-	}()
-}
-
+// Cleanup initlializes RabbitMQ Shutdown.
 func (tracer *Tracer) Cleanup() error {
 	return tracer.rbSession.Shutdown()
 }
 
-func (tracer *Tracer) handleDelivery(derivate *provutil.Entity) {
-	activityExists, agentExists, supervisorExists, err := tracer.createProvEntry(derivate)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+// Listen starts the tracer service.
+func (tracer *Tracer) Listen() {
+	derivatives := make(chan *util.Entity)
+	commit := make(chan struct{})
 
-	err = tracer.createInfoEntries(derivate, activityExists, agentExists, supervisorExists)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-}
-
-func (tracer *Tracer) createProvEntry(entity *provutil.Entity) (bool, bool, bool, error) {
-	var err error
-	activityExists, agentExists, supervisorExists := false, false, false
-
-	if entity.WasGeneratedBy.IsBatch {
-		activityExists = tracer.fetchActivityUID(entity.WasGeneratedBy)
-	}
-
-	if err := tracer.fetchUsedEntities(entity); err != nil {
-		return activityExists, agentExists, supervisorExists, err
-	}
-
-	if err := tracer.fetchOriginalEntities(entity); err != nil {
-		return activityExists, agentExists, supervisorExists, err
-	}
-
-	if agentExists, supervisorExists, err = tracer.fetchAgents(entity); err != nil {
-		return activityExists, agentExists, supervisorExists, err
-	}
-
-	assigned, err := tracer.provDB.InsertDerivate(entity)
-	if err != nil {
-		return activityExists, agentExists, supervisorExists, err
-	}
-
-	log.Printf("created provenance entries as %v\n", assigned)
-
-	entity.UID = assigned["entity"]
-
-	if !activityExists {
-		entity.WasGeneratedBy.UID = assigned["activity"]
-		log.Printf("activity <%s> not in database, creating entry\n", entity.WasGeneratedBy.ID)
-	}
-
-	if !agentExists {
-		entity.WasGeneratedBy.WasAssociatedWith.UID = assigned["agent"]
-		log.Printf("agent <%s> not in database, creating entry\n", entity.WasGeneratedBy.WasAssociatedWith.ID)
-	}
-
-	if !supervisorExists {
-		entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = assigned["supervisor"]
-		log.Printf("agent(supervisor) <%s> not in database, creating entry\n", entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID)
-	}
-
-	return activityExists, agentExists, supervisorExists, err
-}
-
-func (tracer *Tracer) fetchUsedEntities(entity *provutil.Entity) error {
-	numEntities := len(entity.WasGeneratedBy.Used)
-	if numEntities > 0 {
-		for i, e := range entity.WasGeneratedBy.Used {
-			uid := tracer.infoDB.EntityUID(e.ID)
-			if uid != "" {
-				entity.WasGeneratedBy.Used[i].UID = uid
+	go func() {
+		for {
+			select {
+			case derivative := <-tracer.deliveries:
+				derivatives <- derivative
+			case <-time.After(timerDuration):
+				commit <- struct{}{}
+				derivative := <-tracer.deliveries
+				derivatives <- derivative
 			}
 		}
-		log.Println("fetched uids of used entities")
-	} else {
-		log.Println("no used entities to fetch, skipping")
-	}
-	return nil
+	}()
+
+	go tracer.handleDerivatives(derivatives, commit)
 }
 
-func (tracer *Tracer) fetchOriginalEntities(entity *provutil.Entity) error {
-	numEntities := len(entity.WasDerivedFrom)
-	if numEntities > 0 {
-		for i, e := range entity.WasDerivedFrom {
-			uid := tracer.infoDB.EntityUID(e.ID)
-			if uid != "" {
-				entity.WasDerivedFrom[i].UID = uid
+func (tracer *Tracer) handleDerivatives(derivatives <-chan *util.Entity, commit <-chan struct{}) {
+	txn := tracer.db.NewTransaction()
+	for {
+		select {
+		case derivative := <-derivatives:
+			tracer.prepare(derivative, txn)
+			if txn.Size == transactionSizeLimit {
+				log.Println("batch full, commiting...")
+				tracer.commitTransaction(txn)
+				txn = tracer.db.NewTransaction()
+				tracer.cache.items = make(map[string]string)
 			}
+		case <-commit:
+			if len(txn.Mutation) == 0 {
+				continue
+			}
+			log.Println("no new delivery within time window, commiting...")
+			tracer.commitTransaction(txn)
+			txn = tracer.db.NewTransaction()
+			tracer.cache.items = make(map[string]string)
 		}
-		log.Println("fetched uids of related entities")
+	}
+}
+
+func (tracer *Tracer) commitTransaction(txn *db.Transaction) {
+	_, err := tracer.db.RunMutation(&txn.Mutation)
+	if err != nil {
+		log.Println(err)
 	} else {
-		log.Println("entity has no related entities to fetch, skipping")
+		log.Printf("successfully commited %v items\n", txn.Size)
 	}
-	return nil
 }
 
-func (tracer *Tracer) fetchAgents(entity *provutil.Entity) (bool, bool, error) {
-	var err error
-	agentExists, supervisorExists := false, false
+func (tracer *Tracer) prepareActivity(activity *util.Activity, query *db.Query) bool {
+	missed := false
 
-	agentUID := tracer.infoDB.AgentUID(entity.WasGeneratedBy.WasAssociatedWith.ID)
-
-	if agentUID != "" {
-		entity.WasGeneratedBy.WasAssociatedWith.UID = agentUID
-		agentExists = true
-	}
-
-	supervisorUID := tracer.infoDB.AgentUID(entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.ID)
-
-	if supervisorUID != "" {
-		entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf.UID = supervisorUID
-		supervisorExists = true
-	}
-	return agentExists, supervisorExists, err
-}
-
-func (tracer *Tracer) fetchActivityUID(activity *provutil.Activity) bool {
-	activityExists := false
-	uid := tracer.infoDB.ActivitytUID(activity.ID)
-	if uid != "" {
+	if uid, ok := tracer.cache.get(activity.ID); ok {
 		activity.UID = uid
-		activityExists = true
+		return missed
+	} else if activity.IsBatch {
+		query.SetVariable(db.VariableActivityID, activity.ID)
+		missed = true
 	}
-	return activityExists
+
+	return missed
 }
 
-func (tracer *Tracer) createInfoEntries(entity *provutil.Entity, activityExists bool, agentExists bool, supervisorExists bool) error {
-	err := tracer.addEntity(entity)
-	if err != nil {
-		return err
-	}
+func (tracer *Tracer) prepareAgent(agent *util.Agent, query *db.Query, isSupervisor bool) bool {
+	missed := false
 
-	if !activityExists {
-		err = tracer.addActivity(entity)
+	if uid, ok := tracer.cache.get(agent.ID); ok {
+		agent.UID = uid
+		return missed
+	}
+	if isSupervisor {
+		query.SetVariable(db.VariableSupervisorID, agent.ID)
+	} else {
+		query.SetVariable(db.VariableAgentID, agent.ID)
+	}
+	missed = true
+
+	return missed
+}
+func (tracer *Tracer) prepare(derivative *util.Entity, txn *db.Transaction) error {
+	activity := derivative.WasGeneratedBy
+	agent := derivative.WasGeneratedBy.WasAssociatedWith
+	supervisor := derivative.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf
+
+	query := db.NewQuery(db.QueryAllUIDsByID)
+
+	activityMissed := tracer.prepareActivity(activity, query)
+	agentMissed := tracer.prepareAgent(agent, query, false)
+	supervisorMissed := tracer.prepareAgent(supervisor, query, true)
+
+	if activityMissed || agentMissed || supervisorMissed {
+		err := tracer.fetchAndCacheUids(derivative, query)
 		if err != nil {
 			return err
 		}
 	}
 
-	if !agentExists {
-		tracer.addAgent(entity, false)
-		if err != nil {
-			return err
-		}
-	}
+	log.Printf("appending entity %s to mutation", derivative.ID)
+	txn.Mutation = append(txn.Mutation, derivative)
+	txn.Size++
 
-	if !supervisorExists {
-		tracer.addAgent(entity, true)
-		if err != nil {
-			return err
-		}
-	}
-
-	log.Println("inserted mongodb entries")
 	return nil
 }
 
-func (tracer *Tracer) addEntity(entity *provutil.Entity) error {
-	var buffer bytes.Buffer
-	err := json.Compact(&buffer, entity.Data)
+func (tracer *Tracer) fetchAndCacheUids(derivative *util.Entity, query *db.Query) error {
+	activity := derivative.WasGeneratedBy
+	agent := derivative.WasGeneratedBy.WasAssociatedWith
+	supervisor := derivative.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf
 
+	activityUID := fmt.Sprintf("_:%s", activity.ID)
+	agentUID := fmt.Sprintf("_:%s", agent.ID)
+	supervisorUID := fmt.Sprintf("_:%s", supervisor.ID)
+
+	result, err := tracer.db.RunQueryWithVars(query)
 	if err != nil {
 		return err
 	}
 
-	entity.Data = buffer.Bytes()
-	return tracer.infoDB.InsertEntity(entity)
+	if len(result.Activity) == 1 {
+		activityUID = result.Activity[0].UID
+	}
+
+	if len(result.Agent) == 1 {
+		agentUID = result.Agent[0].UID
+	}
+
+	if len(result.Supervisor) == 1 {
+		supervisorUID = result.Supervisor[0].UID
+	}
+
+	activity.UID = activityUID
+	agent.UID = agentUID
+	supervisor.UID = supervisorUID
+
+	tracer.cache.set(activity.ID, activityUID)
+	tracer.cache.set(agent.ID, agentUID)
+	tracer.cache.set(supervisor.ID, supervisorUID)
+
+	return nil
 }
 
-func (tracer *Tracer) addAgent(entity *provutil.Entity, isSupervisor bool) error {
-	var agent *provutil.Agent
-	var buffer bytes.Buffer
-
-	if isSupervisor {
-		agent = entity.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf
-	} else {
-		agent = entity.WasGeneratedBy.WasAssociatedWith
-	}
-	err := json.Compact(&buffer, agent.Data)
-
-	if err != nil {
-		return err
-	}
-
-	agent.Data = buffer.Bytes()
-
-	return tracer.infoDB.InsertAgent(agent)
+func (c *cache) get(key string) (string, bool) {
+	value, ok := c.items[key]
+	return value, ok
 }
 
-func (tracer *Tracer) addActivity(entity *provutil.Entity) error {
-	var buffer bytes.Buffer
-	err := json.Compact(&buffer, entity.WasGeneratedBy.Data)
-
-	if err != nil {
-		return err
-	}
-
-	entity.WasGeneratedBy.Data = buffer.Bytes()
-	return tracer.infoDB.InsertActivity(entity.WasGeneratedBy)
+func (c *cache) set(key string, value string) {
+	c.items[key] = value
 }
