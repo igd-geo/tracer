@@ -7,27 +7,22 @@ import (
 
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/api"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/api/config"
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/dgraph"
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/mongodb"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/db"
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
 
 	config := config.New()
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	installFlags(config)
+	config.InstallFlags()
 
-	infoDB := mongodb.NewClient(config.InfoDB)
-	provDB := dgraph.NewClient(config.ProvDB)
+	db := db.NewClient(config.DB)
 
-	server := api.NewServer(config, infoDB, provDB)
+	server := api.NewServer(config, db)
 	go server.Run()
 
 	<-signalChan
-	err := server.Cleanup()
-	if err != nil {
-		log.Fatal(err)
-	}
 }

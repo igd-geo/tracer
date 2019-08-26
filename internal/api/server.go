@@ -2,43 +2,35 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/api/config"
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/provutil"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/db"
 	"github.com/graphql-go/graphql"
 )
 
 type Server struct {
 	config *config.Config
-	provDB provutil.ProvDB
-	infoDB provutil.InfoDB
+	db     *db.Client
 }
 
-func NewServer(config *config.Config, infoDB provutil.InfoDB, provDB provutil.ProvDB) *Server {
+func NewServer(config *config.Config, db *db.Client) *Server {
 	return &Server{
 		config: config,
-		infoDB: infoDB,
-		provDB: provDB,
+		db:     db,
 	}
 }
 
 func (s *Server) Run() {
-
-	schema := initGraphQL(s.infoDB, s.provDB)
+	schema := initGraphQL(s.db)
 
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		result := executeQuery(r.URL.Query().Get("query"), schema)
 		json.NewEncoder(w).Encode(result)
 	})
 
-	log.Fatal(http.ListenAndServe(":1234", nil))
-}
-
-func (s *Server) Cleanup() error {
-	return nil
+	log.Fatal(http.ListenAndServe(s.config.Port, nil))
 }
 
 func executeQuery(query string, schema graphql.Schema) *graphql.Result {
@@ -47,7 +39,7 @@ func executeQuery(query string, schema graphql.Schema) *graphql.Result {
 		RequestString: query,
 	})
 	if len(result.Errors) > 0 {
-		fmt.Printf("wrong result, unexpected errors: %v", result.Errors)
+		log.Printf("wrong result, unexpected errors: %v", result.Errors)
 	}
 	return result
 }

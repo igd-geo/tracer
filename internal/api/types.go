@@ -99,6 +99,18 @@ var activityType = graphql.NewObject(
 	},
 )
 
+var graphType = graphql.NewObject(
+	graphql.ObjectConfig{
+		Name:        "Graph",
+		Description: "Provenance Graph Object",
+		Fields: graphql.Fields{
+			"structure": &graphql.Field{
+				Type: jsonRaw,
+			},
+		},
+	},
+)
+
 var jsonRaw = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "JSON",
 	Description: "Raw JSON Byte Array",

@@ -1,20 +1,22 @@
-package rabbitmq
+package broker
 
 import (
 	"fmt"
 	"log"
 
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/provutil"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/util"
 	"github.com/streadway/amqp"
 )
 
+// Session is a wrapper for a RabbitMQ consumer and producer
 type Session struct {
 	consumer *consumer
 	producer *producer
 	conn     *amqp.Connection
 }
 
-func New(url string, msgChan chan<- *provutil.Entity, ctag string, exchange string, routingKey string) *Session {
+// New returns a new Session
+func New(url string, msgChan chan<- *util.Entity, ctag string, exchange string, routingKey string) *Session {
 	conn, err := amqp.Dial(url)
 	failOnError(err, "Failed to connect to RabbitMQ")
 	return &Session{
@@ -24,6 +26,12 @@ func New(url string, msgChan chan<- *provutil.Entity, ctag string, exchange stri
 	}
 }
 
+// Publish sends a new message to the defined routing key
+func (s *Session) Publish(msg string, routingKey string) error {
+	return s.producer.publish(msg, routingKey)
+}
+
+// Shutdown gracefully closes the Session
 func (s *Session) Shutdown() error {
 	if err := s.consumer.shutdown(); err != nil {
 		return err

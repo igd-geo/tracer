@@ -1,4 +1,4 @@
-package rabbitmq
+package broker
 
 import (
 	"log"
@@ -38,18 +38,15 @@ func newProducer(conn *amqp.Connection, url string, exchange string, routingKey 
 	)
 	failOnError(err, "Failed to declare a exchange")
 
-	err = p.publish("Hi")
-	failOnError(err, "Failed to initialize producer")
-
 	return p
 }
 
-func (p *producer) publish(body string) error {
+func (p *producer) publish(body string, routingKey string) error {
 	err := p.channel.Publish(
-		p.exchange,   // publish to an exchange
-		p.routingKey, // routing to 0 or more queues
-		false,        // mandatory
-		false,        // immediate
+		p.exchange, // publish to an exchange
+		routingKey, // routing to 0 or more queues
+		false,      // mandatory
+		false,      // immediate
 		amqp.Publishing{
 			Headers:         amqp.Table{},
 			ContentType:     "application/json",
