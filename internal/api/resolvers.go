@@ -16,7 +16,6 @@ func resolveQueryEntity(dbClient *db.Client, p graphql.ResolveParams) (*util.Ent
 
 	query := db.NewQuery(db.QueryEntityUIDByID)
 	query.SetVariable(db.VariableEntityID, id)
-	fmt.Printf("%+v", query)
 
 	res, err := dbClient.RunQueryWithVars(query)
 	if err != nil {

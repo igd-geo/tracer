@@ -89,10 +89,6 @@ func (c *Client) RunQueryWithVars(query *Query) (Result, error) {
 		return res, err
 	}
 
-	log.Printf("%+v", string(resp.GetJson()))
-	log.Printf("%+v", res.Graph)
-	log.Printf("%+v", res.Graph[0])
-
 	return res, nil
 }
 

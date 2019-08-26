@@ -11,9 +11,6 @@ import (
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/util"
 )
 
-const transactionSizeLimit = 2000
-const timerDuration = 100 * time.Millisecond
-
 // Tracer is a provenance service.
 type Tracer struct {
 	deliveries <-chan *util.Entity
@@ -53,13 +50,14 @@ func (tracer *Tracer) Cleanup() error {
 func (tracer *Tracer) Listen() {
 	derivatives := make(chan *util.Entity)
 	commit := make(chan struct{})
+	batchTimeout := time.Duration(tracer.config.BatchTimeout) * time.Millisecond
 
 	go func() {
 		for {
 			select {
 			case derivative := <-tracer.deliveries:
 				derivatives <- derivative
-			case <-time.After(timerDuration):
+			case <-time.After(batchTimeout):
 				commit <- struct{}{}
 				derivative := <-tracer.deliveries
 				derivatives <- derivative
@@ -76,7 +74,7 @@ func (tracer *Tracer) handleDerivatives(derivatives <-chan *util.Entity, commit 
 		select {
 		case derivative := <-derivatives:
 			tracer.prepare(derivative, txn)
-			if txn.Size == transactionSizeLimit {
+			if txn.Size == tracer.config.BatchSizeLimit {
 				log.Println("batch full, commiting...")
 				tracer.commitTransaction(txn)
 				txn = tracer.db.NewTransaction()

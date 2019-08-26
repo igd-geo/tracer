@@ -30,7 +30,7 @@ func (s *Server) Run() {
 		json.NewEncoder(w).Encode(result)
 	})
 
-	log.Fatal(http.ListenAndServe(":1234", nil))
+	log.Fatal(http.ListenAndServe(s.config.Port, nil))
 }
 
 func executeQuery(query string, schema graphql.Schema) *graphql.Result {
