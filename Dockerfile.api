@@ -18,7 +18,7 @@ FROM alpine:latest
 
 RUN apk update && apk add ca-certificates
 
-ENV DEPLOYMENT_ENVIRONMENT = "PROD"
+ENV DEPLOYMENT_ENVIRONMENT "PROD"
 ENV DATABASE_URL ""
 ENV BROKER_URL ""
 ENV BROKER_USER ""
