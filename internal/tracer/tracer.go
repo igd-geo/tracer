@@ -74,7 +74,10 @@ func (tracer *Tracer) handleDerivatives(derivatives <-chan *util.Entity, commit 
 	for {
 		select {
 		case derivative := <-derivatives:
-			tracer.prepare(derivative, txn)
+			err := tracer.prepare(derivative, txn)
+			if err != nil {
+				log.Println(err)
+			}
 			if txn.Size == tracer.config.BatchSizeLimit {
 				log.Println("batch full, commiting...")
 				tracer.commitTransaction(txn)
@@ -94,10 +97,11 @@ func (tracer *Tracer) handleDerivatives(derivatives <-chan *util.Entity, commit 
 }
 
 func (tracer *Tracer) commitTransaction(txn *db.Transaction) {
-	_, err := tracer.db.RunMutation(&txn.Mutation)
+	assigned, err := tracer.db.RunMutation(&txn.Mutation)
 	if err != nil {
 		log.Println(err)
 	} else {
+		log.Printf("%+v", assigned)
 		log.Printf("successfully commited %v items\n", txn.Size)
 	}
 }
@@ -107,6 +111,7 @@ func (tracer *Tracer) prepareActivity(activity *util.Activity, query *db.Query) 
 
 	if uid, ok := tracer.cache.get(activity.ID); ok {
 		activity.UID = uid
+		query.SetVariable(db.VariableActivityID, "")
 		return missed
 	} else if activity.IsBatch {
 		query.SetVariable(db.VariableActivityID, activity.ID)
@@ -150,7 +155,6 @@ func (tracer *Tracer) prepare(derivative *util.Entity, txn *db.Transaction) erro
 		}
 	}
 
-	log.Printf("appending entity %s to mutation", derivative.ID)
 	txn.Mutation = append(txn.Mutation, derivative)
 	txn.Size++
 

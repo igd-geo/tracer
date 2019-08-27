@@ -25,7 +25,7 @@ const (
 								}
 							}`
 
-	QueryAllUIDsByID = `query All($entity: string, $activity: string, agent: string, supervisor: string) {
+	QueryAllUIDsByID = `query All($entity: string, $activity: string, $agent: string, $supervisor: string) {
 							entity(func: eq(id, $entity)) {
 								uid
 							}
