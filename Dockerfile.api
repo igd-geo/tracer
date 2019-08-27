@@ -2,7 +2,6 @@ FROM golang:alpine AS build
 
 RUN apk update && apk add --no-cache git ca-certificates
 
-RUN mkdir -p /tracer
 WORKDIR /tracer
 
 COPY ./go.mod ./go.sum ./
