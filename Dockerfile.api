@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 	-installsuffix "static" \
 	-o /go/bin/api /tracer/cmd/api
 
-FROM alpine
+FROM alpine:latest
 
 RUN apk update && apk add ca-certificates
 
