@@ -32,7 +32,6 @@ type Config struct {
 
 // New returns an empty Config struct
 func New() *Config {
-	var err error
 	config := Config{
 		DB:             defaultDB,
 		Broker:         defaultBroker,
@@ -47,16 +46,17 @@ func New() *Config {
 		config.DB = os.Getenv(envDatabaseURL)
 		config.Broker = fmt.Sprintf("amqp://%s:%s@%s", brokerUser, brokerPassword, brokerURL)
 
-		config.BatchSizeLimit, err = strconv.Atoi(os.Getenv(envBatchSizeLimit))
-		if err != nil {
-			log.Fatal(err)
+		batchSizeLimit, err := strconv.Atoi(os.Getenv(envBatchSizeLimit))
+		if err != nil || batchSizeLimit < 0 {
+			log.Fatal("could not parse batch size limit, value must be > 0")
 		}
+		config.BatchSizeLimit = batchSizeLimit
 
-		config.BatchTimeout, err = strconv.Atoi(os.Getenv(envBatchTimeout))
+		batchTimeout, err := strconv.Atoi(os.Getenv(envBatchTimeout))
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("could not parse batch timeout, value must be > 0")
 		}
-
+		config.BatchTimeout = batchTimeout
 	}
 	return &config
 }
