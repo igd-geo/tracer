@@ -20,11 +20,11 @@ FROM alpine
 RUN apk update && apk add ca-certificates
 
 ENV ENVIRONMENT = "PROD"
-ENV DATABASE_URL "localhost:9080"
-ENV BROKER_URL "localhost:5672"
-ENV BROKER_USER "guest"
-ENV BROKER_PASSWORD "guest"
-ENV PORT ":1234"
+ENV DATABASE_URL ""
+ENV BROKER_URL ""
+ENV BROKER_USER ""
+ENV BROKER_PASSWORD ""
+ENV PORT ""
 
 
 COPY --from=build /go/bin/api /go/bin/api
