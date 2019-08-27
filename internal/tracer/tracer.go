@@ -31,9 +31,10 @@ type cache struct {
 // Setup sets up the tracer service and initializes all required components
 func Setup(config *config.Config, db *db.Client, broker *broker.Session, deliveries chan *util.Entity) *Tracer {
 	tracer := Tracer{
-		deliveries: deliveries,
-		rbSession:  broker,
+		config:     config,
 		db:         db,
+		rbSession:  broker,
+		deliveries: deliveries,
 		cache: cache{
 			items: make(map[string]string),
 		},

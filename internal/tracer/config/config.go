@@ -53,7 +53,7 @@ func New() *Config {
 		config.BatchSizeLimit = batchSizeLimit
 
 		batchTimeout, err := strconv.Atoi(os.Getenv(envBatchTimeout))
-		if err != nil {
+		if err != nil || batchTimeout < 0 {
 			log.Fatal("could not parse batch timeout, value must be > 0")
 		}
 		config.BatchTimeout = batchTimeout
