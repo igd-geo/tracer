@@ -19,10 +19,9 @@ func main() {
 	signal.Notify(signalChan, os.Interrupt)
 
 	config := config.New()
-	config.InstallFlags()
 
 	deliveries := make(chan *util.Entity)
-	broker := broker.New(config.Broker, deliveries, config.ConsumerTag, "notifications", "topic")
+	broker := broker.New(config.Broker, deliveries, "notifications", "topic")
 	db := db.NewClient(config.DB)
 
 	tracer := tracer.Setup(config, db, broker, deliveries)

@@ -1,13 +1,23 @@
 package config
 
 import (
-	flag "github.com/spf13/pflag"
+	"fmt"
+	"log"
+	"os"
+	"strconv"
 )
 
 const (
+	envEnvironment    = "ENVIRONMENT"
+	envDatabaseURL    = "DATABASE_URL"
+	envBrokerURL      = "BROKER_URL"
+	envBrokerUser     = "BROKER_USER"
+	envBrokerPassword = "BROKER_PASSWORD"
+	envBatchSizeLimit = "BATCH_SIZE_LIMIT"
+	envBatchTimeout   = "BATCH_TIMEOUT"
+
 	defaultDB             = "localhost:9080"
 	defaultBroker         = "amqp://guest:guest@localhost:5672/"
-	defaultConsumerTag    = "tracer_consumer"
 	defaultBatchSizeLimit = 2000
 	defaultBatchTimeout   = 100
 )
@@ -16,23 +26,37 @@ const (
 type Config struct {
 	DB             string
 	Broker         string
-	ConsumerTag    string
 	BatchSizeLimit int
 	BatchTimeout   int
 }
 
 // New returns an empty Config struct
 func New() *Config {
-	return &Config{}
-}
+	var err error
+	config := Config{
+		DB:             defaultDB,
+		Broker:         defaultBroker,
+		BatchSizeLimit: defaultBatchSizeLimit,
+		BatchTimeout:   defaultBatchTimeout,
+	}
+	if os.Getenv(envEnvironment) == "PROD" {
+		brokerUser := os.Getenv(envBrokerUser)
+		brokerPassword := os.Getenv(envBrokerPassword)
+		brokerURL := os.Getenv(os.Getenv(envBrokerURL))
 
-// InstallFlags fills a config with values passed by flags
-func (config *Config) InstallFlags() {
-	flag.StringVar(&config.DB, "db", defaultDB, "database grpc url")
-	flag.StringVar(&config.Broker, "broker", defaultBroker, "rabbitmq url")
-	flag.StringVar(&config.ConsumerTag, "ctag", defaultConsumerTag, "consumer tag")
-	flag.IntVar(&config.BatchSizeLimit, "batchsize", defaultBatchSizeLimit, "db batch size")
-	flag.IntVar(&config.BatchTimeout, "batchtimeout", defaultBatchTimeout, "db batch timeout")
+		config.DB = os.Getenv(envDatabaseURL)
+		config.Broker = fmt.Sprintf("amqp://%s:%s@%s", brokerUser, brokerPassword, brokerURL)
 
-	flag.Parse()
+		config.BatchSizeLimit, err = strconv.Atoi(os.Getenv(envBatchSizeLimit))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		config.BatchTimeout, err = strconv.Atoi(os.Getenv(envBatchTimeout))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+	}
+	return &config
 }

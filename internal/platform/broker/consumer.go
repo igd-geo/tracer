@@ -9,6 +9,8 @@ import (
 	"github.com/streadway/amqp"
 )
 
+const consumerTag = "tracer_consumer"
+
 // Delivery is a custom wrapper for RabbitMQ deliveries
 type Delivery struct {
 	Derivative *util.Entity `json:"entity,omitempty"`
@@ -17,15 +19,13 @@ type Delivery struct {
 type consumer struct {
 	conn    *amqp.Connection
 	channel *amqp.Channel
-	tag     string
 	done    chan error
 }
 
-func newConsumer(conn *amqp.Connection, url string, msgChan chan<- *util.Entity, ctag string) *consumer {
+func newConsumer(conn *amqp.Connection, url string, msgChan chan<- *util.Entity) *consumer {
 	c := &consumer{
 		conn:    conn,
 		channel: nil,
-		tag:     ctag,
 		done:    make(chan error),
 	}
 	var err error
@@ -70,13 +70,13 @@ func newConsumer(conn *amqp.Connection, url string, msgChan chan<- *util.Entity,
 	failOnError(err, "Failed to bind a queue")
 
 	deliveries, err := c.channel.Consume(
-		queue.Name, // queue
-		c.tag,      // consumer
-		true,       // auto ack
-		false,      // exclusive
-		false,      // no local
-		false,      // no wait
-		nil,        // args
+		queue.Name,  // queue
+		consumerTag, // consumer
+		true,        // auto ack
+		false,       // exclusive
+		false,       // no local
+		false,       // no wait
+		nil,         // args
 	)
 	failOnError(err, "Failed to register a consumer")
 
@@ -87,7 +87,7 @@ func newConsumer(conn *amqp.Connection, url string, msgChan chan<- *util.Entity,
 
 func (c *consumer) shutdown() error {
 	log.Println("Shutting Down Consumer...")
-	if err := c.channel.Cancel(c.tag, true); err != nil {
+	if err := c.channel.Cancel(consumerTag, true); err != nil {
 		return fmt.Errorf("Consumer cancel failed: %s", err)
 	}
 
