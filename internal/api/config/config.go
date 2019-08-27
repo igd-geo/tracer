@@ -35,7 +35,7 @@ func New() *Config {
 	if os.Getenv(envDeploymentEnvironment) == "PROD" {
 		brokerUser := os.Getenv(envBrokerUser)
 		brokerPassword := os.Getenv(envBrokerPassword)
-		brokerURL := os.Getenv(os.Getenv(envBrokerURL))
+		brokerURL := os.Getenv(envBrokerURL)
 
 		config.DB = os.Getenv(envDatabaseURL)
 		config.Broker = fmt.Sprintf("amqp://%s:%s@%s", brokerUser, brokerPassword, brokerURL)
