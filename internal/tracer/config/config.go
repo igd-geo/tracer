@@ -18,7 +18,7 @@ const (
 
 	defaultDB             = "localhost:9080"
 	defaultBroker         = "amqp://guest:guest@localhost:5672/"
-	defaultBatchSizeLimit = 2000
+	defaultBatchSizeLimit = 1000
 	defaultBatchTimeout   = 100
 )
 
