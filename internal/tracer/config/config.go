@@ -8,13 +8,13 @@ import (
 )
 
 const (
-	envEnvironment    = "ENVIRONMENT"
-	envDatabaseURL    = "DATABASE_URL"
-	envBrokerURL      = "BROKER_URL"
-	envBrokerUser     = "BROKER_USER"
-	envBrokerPassword = "BROKER_PASSWORD"
-	envBatchSizeLimit = "BATCH_SIZE_LIMIT"
-	envBatchTimeout   = "BATCH_TIMEOUT"
+	envDeploymentEnvironment = "DEPLOYMENT_ENVIRONMENT"
+	envDatabaseURL           = "DATABASE_URL"
+	envBrokerURL             = "BROKER_URL"
+	envBrokerUser            = "BROKER_USER"
+	envBrokerPassword        = "BROKER_PASSWORD"
+	envBatchSizeLimit        = "BATCH_SIZE_LIMIT"
+	envBatchTimeout          = "BATCH_TIMEOUT"
 
 	defaultDB             = "localhost:9080"
 	defaultBroker         = "amqp://guest:guest@localhost:5672/"
@@ -38,7 +38,7 @@ func New() *Config {
 		BatchSizeLimit: defaultBatchSizeLimit,
 		BatchTimeout:   defaultBatchTimeout,
 	}
-	if os.Getenv(envEnvironment) == "PROD" {
+	if os.Getenv(envDeploymentEnvironment) == "PROD" {
 		brokerUser := os.Getenv(envBrokerUser)
 		brokerPassword := os.Getenv(envBrokerPassword)
 		brokerURL := os.Getenv(os.Getenv(envBrokerURL))

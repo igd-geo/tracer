@@ -6,12 +6,12 @@ import (
 )
 
 const (
-	envEnvironment    = "ENVIRONMENT"
-	envDatabaseURL    = "DATABASE_URL"
-	envBrokerURL      = "BROKER_URL"
-	envBrokerUser     = "BROKER_USER"
-	envBrokerPassword = "BROKER_PASSWORD"
-	envPort           = "API_PORT"
+	envDeploymentEnvironment = "DEPLOYMENT_ENVIRONMENT"
+	envDatabaseURL           = "DATABASE_URL"
+	envBrokerURL             = "BROKER_URL"
+	envBrokerUser            = "BROKER_USER"
+	envBrokerPassword        = "BROKER_PASSWORD"
+	envPort                  = "API_PORT"
 
 	defaultDB     = "localhost:9080"
 	defaultBroker = "amqp://guest:guest@localhost:5672/"
@@ -32,7 +32,7 @@ func New() *Config {
 		Broker: defaultBroker,
 		Port:   defaultPort,
 	}
-	if os.Getenv(envEnvironment) == "PROD" {
+	if os.Getenv(envDeploymentEnvironment) == "PROD" {
 		brokerUser := os.Getenv(envBrokerUser)
 		brokerPassword := os.Getenv(envBrokerPassword)
 		brokerURL := os.Getenv(os.Getenv(envBrokerURL))
