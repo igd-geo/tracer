@@ -15,12 +15,20 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 	-installsuffix "static" \
 	-o /go/bin/api /tracer/cmd/api
 
-FROM scratch
+FROM alpine
 
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+RUN apk update && apk add ca-certificates
+
+ENV ENVIRONMENT = "PROD"
+ENV DATABASE_URL "localhost:9080"
+ENV BROKER_URL "localhost:5672"
+ENV BROKER_USER "guest"
+ENV BROKER_PASSWORD "guest"
+ENV PORT ":1234"
+
 
 COPY --from=build /go/bin/api /go/bin/api
 
 EXPOSE 8080
 
-ENTRYPOINT ["/go/bin/api"]
+CMD "/go/bin/api"

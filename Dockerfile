@@ -15,10 +15,16 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 	-installsuffix "static" \
 	-o /go/bin/tracer /tracer/cmd/tracer
 
-FROM scratch
+FROM alpine:latest
 
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+ENV ENVIRONMENT = "PROD"
+ENV DATABASE_URL "localhost:9080"
+ENV BROKER_URL "localhost:5672"
+ENV BROKER_USER "guest"
+ENV BROKER_PASSWORD "guest"
+ENV BATCH_SIZE_LIMIT "1000"
+ENV BATCH_TIMEOUT "100"
 
 COPY --from=build /go/bin/tracer /go/bin/tracer
 
-ENTRYPOINT ["/go/bin/tracer"]
+CMD "/go/bin/tracer"
