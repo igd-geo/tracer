@@ -16,11 +16,11 @@ type Session struct {
 }
 
 // New returns a new Session
-func New(url string, msgChan chan<- *util.Entity, ctag string, exchange string, routingKey string) *Session {
+func New(url string, msgChan chan<- *util.Entity, exchange string, routingKey string) *Session {
 	conn, err := amqp.Dial(url)
 	failOnError(err, "Failed to connect to RabbitMQ")
 	return &Session{
-		consumer: newConsumer(conn, url, msgChan, ctag),
+		consumer: newConsumer(conn, url, msgChan),
 		producer: newProducer(conn, url, exchange, routingKey),
 		conn:     conn,
 	}

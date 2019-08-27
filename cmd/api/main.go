@@ -17,7 +17,6 @@ func main() {
 	signal.Notify(signalChan, os.Interrupt)
 
 	config := config.New()
-	config.InstallFlags()
 
 	db := db.NewClient(config.DB)
 

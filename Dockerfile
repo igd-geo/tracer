@@ -2,7 +2,6 @@ FROM golang:alpine AS build
 
 RUN apk update && apk add --no-cache git ca-certificates
 
-RUN mkdir -p /tracer
 WORKDIR /tracer
 
 COPY ./go.mod ./go.sum ./
@@ -15,10 +14,16 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 	-installsuffix "static" \
 	-o /go/bin/tracer /tracer/cmd/tracer
 
-FROM scratch
+FROM alpine:latest
 
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+ENV DEPLOYMENT_ENVIRONMENT = "PROD"
+ENV DATABASE_URL ""
+ENV BROKER_URL ""
+ENV BROKER_USER ""
+ENV BROKER_PASSWORD ""
+ENV BATCH_SIZE_LIMIT ""
+ENV BATCH_TIMEOUT ""
 
 COPY --from=build /go/bin/tracer /go/bin/tracer
 
-ENTRYPOINT ["/go/bin/tracer"]
+CMD "/go/bin/tracer"

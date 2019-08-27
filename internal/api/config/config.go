@@ -1,35 +1,45 @@
 package config
 
 import (
-	flag "github.com/spf13/pflag"
+	"fmt"
+	"os"
 )
 
 const (
-	defaultDB          = "localhost:9080"
-	defaultBroker      = "amqp://guest:guest@localhost:5672/"
-	defaultConsumerTag = "tracer_consumer"
-	defaultPort        = ":1234"
+	envDeploymentEnvironment = "DEPLOYMENT_ENVIRONMENT"
+	envDatabaseURL           = "DATABASE_URL"
+	envBrokerURL             = "BROKER_URL"
+	envBrokerUser            = "BROKER_USER"
+	envBrokerPassword        = "BROKER_PASSWORD"
+	envPort                  = "API_PORT"
+
+	defaultDB     = "localhost:9080"
+	defaultBroker = "amqp://guest:guest@localhost:5672/"
+	defaultPort   = ":1234"
 )
 
 // Config contains configuration information
 type Config struct {
-	DB          string
-	Broker      string
-	ConsumerTag string
-	Port        string
+	DB     string
+	Broker string
+	Port   string
 }
 
 // New returns an empty Config struct
 func New() *Config {
-	return &Config{}
-}
+	config := Config{
+		DB:     defaultDB,
+		Broker: defaultBroker,
+		Port:   defaultPort,
+	}
+	if os.Getenv(envDeploymentEnvironment) == "PROD" {
+		brokerUser := os.Getenv(envBrokerUser)
+		brokerPassword := os.Getenv(envBrokerPassword)
+		brokerURL := os.Getenv(os.Getenv(envBrokerURL))
 
-// InstallFlags fills a config with values passed by flags
-func (config *Config) InstallFlags() {
-	flag.StringVar(&config.DB, "db", defaultDB, "database grpc url")
-	flag.StringVar(&config.Broker, "broker", defaultBroker, "rabbitmq url")
-	flag.StringVar(&config.ConsumerTag, "ctag", defaultConsumerTag, "consumer tag")
-	flag.StringVar(&config.Port, "port", defaultPort, "tracer api port")
-
-	flag.Parse()
+		config.DB = os.Getenv(envDatabaseURL)
+		config.Broker = fmt.Sprintf("amqp://%s:%s@%s", brokerUser, brokerPassword, brokerURL)
+		config.Port = os.Getenv(envPort)
+	}
+	return &config
 }
