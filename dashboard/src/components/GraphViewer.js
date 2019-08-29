@@ -3,7 +3,9 @@ import PropTypes from 'prop-types';
 import Grid from '@material-ui/core/Grid';
 import Paper from '@material-ui/core/Paper';
 import * as d3 from 'd3';
+import { connect } from 'react-redux';
 import { makeStyles } from '@material-ui/core/styles';
+import { setActiveNode } from '../redux/actions';
 
 const useStyles = makeStyles(() => ({
   paper: {
@@ -12,61 +14,58 @@ const useStyles = makeStyles(() => ({
   },
 }));
 
-const nodes_data = [
-  { name: 'Travis', sex: 'M' },
-  { name: 'Rake', sex: 'M' },
-  { name: 'Diana', sex: 'F' },
-  { name: 'Rachel', sex: 'F' },
-  { name: 'Shawn', sex: 'M' },
-  { name: 'Emerald', sex: 'F' },
-];
-const links_data = [
-  { source: 'Travis', target: 'Rake' },
-  { source: 'Diana', target: 'Rake' },
-  { source: 'Diana', target: 'Rachel' },
-  { source: 'Rachel', target: 'Rake' },
-  { source: 'Rachel', target: 'Shawn' },
-  { source: 'Emerald', target: 'Rachel' },
-];
-
-
 function GraphViewer(props) {
+  const radius = 30;
   const classes = useStyles();
+  const { nodes, edges, dispatchActiveNode } = props;
+
 
   useEffect(() => {
     const svg = d3.select('.graphSVG');
+
     if (!svg.selectAll('*').empty()) {
-      return () => {
-        svg.selectAll('*').remove();
-      };
+      svg.selectAll('*').remove();
     }
     const { height, width } = svg.node().getBoundingClientRect();
-    const link_force = d3.forceLink(links_data)
-      .id((d) => d.name);
+    const graph = {
+      nodes,
+      edges,
+    };
 
     const simulation = d3.forceSimulation()
-      .nodes(nodes_data);
+      .nodes(graph.nodes);
     simulation
       .force('charge', d3.forceManyBody())
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collide', d3.forceCollide().strength(0.2).radius(30).iterations(1));
-    simulation.force('links', link_force);
+      .force('collide', d3.forceCollide().radius(50));
+    simulation.force('links', d3.forceLink(edges).id((d) => d.name));
 
     const link = svg.append('g')
       .attr('class', 'links')
       .selectAll('line')
-      .data(links_data)
+      .data(graph.edges)
       .enter()
       .append('line');
 
     const node = svg.append('g')
       .attr('class', 'nodes')
       .selectAll('circle')
-      .data(nodes_data)
+      .data(graph.nodes)
       .enter()
       .append('circle')
-      .attr('r', 20)
-      .attr('fill', 'red');
+      .attr('r', radius)
+      .attr('fill', 'red')
+      .on('click', (clickedNode) => {
+        dispatchActiveNode(clickedNode.id);
+      })
+      .on('mouseover', () => {
+        d3.select(d3.event.target).transition().duration(50).attr('fill', 'orange');
+        d3.select(d3.event.target).style('cursor', 'pointer');
+      })
+      .on('mouseout', () => {
+        d3.select(d3.event.target).style('cursor', 'default');
+        d3.select(d3.event.target).transition().duration(50).attr('fill', 'red');
+      });
 
     const tickActions = () => {
       node
@@ -79,7 +78,11 @@ function GraphViewer(props) {
         .attr('y2', (d) => d.target.y);
     };
     simulation.on('tick', tickActions);
-  });
+
+    return () => {
+      svg.selectAll('*').remove();
+    };
+  }, [nodes, edges, dispatchActiveNode]);
 
   return (
     <Grid
@@ -97,8 +100,24 @@ function GraphViewer(props) {
   );
 }
 
+const mapStateToProps = (state) => ({
+  nodes: state.graph.nodes,
+  edges: state.graph.edges,
+  activeNode: state.graph.activeNode,
+});
+
+const mapDispatchToProps = (dispatch) => ({
+  dispatchActiveNode: (node) => dispatch(setActiveNode(node)),
+});
+
+
 GraphViewer.propTypes = {
-  classes: PropTypes.any,
+  nodes: PropTypes.any,
+  edges: PropTypes.any,
+  dispatchActiveNode: PropTypes.func,
 };
 
-export default GraphViewer;
+export default connect(
+  mapStateToProps,
+  mapDispatchToProps,
+)(GraphViewer);

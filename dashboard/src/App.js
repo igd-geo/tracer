@@ -5,7 +5,6 @@ import CssBaseline from '@material-ui/core/CssBaseline';
 import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import Drawer from '@material-ui/core/Drawer';
-import List from '@material-ui/core/List';
 import Tabs from '@material-ui/core/Tabs';
 import Tab from '@material-ui/core/Tab';
 import Box from '@material-ui/core/Box';
@@ -15,6 +14,7 @@ import Container from '@material-ui/core/Container';
 import { makeStyles } from '@material-ui/core/styles';
 import MetadataViewer from './components/MetdadataViewer';
 import GraphViewer from './components/GraphViewer';
+import DetailViewer from './components/DetailViewer';
 
 const drawerWidth = 420;
 const useStyles = makeStyles((theme) => ({
@@ -83,24 +83,6 @@ function a11yProps(index) {
 
 function App() {
   const classes = useStyles();
-  const data = {
-    nodes: [
-      { name: 'Travis', sex: 'M' },
-      { name: 'Rake', sex: 'M' },
-      { name: 'Diana', sex: 'F' },
-      { name: 'Rachel', sex: 'F' },
-      { name: 'Shawn', sex: 'M' },
-      { name: 'Emerald', sex: 'F' },
-    ],
-    links: [
-      { source: 'Travis', target: 'Rake' },
-      { source: 'Diana', target: 'Rake' },
-      { source: 'Diana', target: 'Rachel' },
-      { source: 'Rachel', target: 'Rake' },
-      { source: 'Rachel', target: 'Shawn' },
-      { source: 'Emerald', target: 'Rachel' },
-    ],
-  };
   const [value, setValue] = React.useState(0);
   const [values, setValues] = React.useState({
     name: '',
@@ -132,7 +114,7 @@ function App() {
         anchor="left"
       >
         <div className={classes.toolbar} />
-        <List />
+        <DetailViewer />
       </Drawer>
       <main className={classes.content}>
         <div className={classes.toolbar} />
@@ -157,7 +139,7 @@ function App() {
             </Grid>
             <Grid item>
               <TabPanel value={value} index={0}>
-                <GraphViewer nodes={data.nodes} links={data.links} />
+                <GraphViewer />
               </TabPanel>
               <TabPanel value={value} index={1}>
                 <MetadataViewer />
