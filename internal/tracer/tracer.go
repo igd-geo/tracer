@@ -138,9 +138,9 @@ func (tracer *Tracer) prepareAgent(agent *util.Agent, query *db.Query, isSupervi
 	return missed
 }
 func (tracer *Tracer) prepare(derivative *util.Entity, txn *db.Transaction) error {
-	activity := derivative.WasGeneratedBy
-	agent := derivative.WasGeneratedBy.WasAssociatedWith
-	supervisor := derivative.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf
+	activity := derivative.WasGeneratedBy[0]
+	agent := derivative.WasGeneratedBy[0].WasAssociatedWith[0]
+	supervisor := derivative.WasGeneratedBy[0].WasAssociatedWith[0].ActedOnBehalfOf[0]
 
 	query := db.NewQuery(db.QueryAllUIDsByID)
 
@@ -162,9 +162,9 @@ func (tracer *Tracer) prepare(derivative *util.Entity, txn *db.Transaction) erro
 }
 
 func (tracer *Tracer) fetchAndCacheUids(derivative *util.Entity, query *db.Query) error {
-	activity := derivative.WasGeneratedBy
-	agent := derivative.WasGeneratedBy.WasAssociatedWith
-	supervisor := derivative.WasGeneratedBy.WasAssociatedWith.ActedOnBehalfOf
+	activity := derivative.WasGeneratedBy[0]
+	agent := derivative.WasGeneratedBy[0].WasAssociatedWith[0]
+	supervisor := derivative.WasGeneratedBy[0].WasAssociatedWith[0].ActedOnBehalfOf[0]
 
 	activityUID := fmt.Sprintf("_:%s", activity.ID)
 	agentUID := fmt.Sprintf("_:%s", agent.ID)

@@ -104,13 +104,74 @@ var graphType = graphql.NewObject(
 		Name:        "Graph",
 		Description: "Provenance Graph Object",
 		Fields: graphql.Fields{
-			"structure": &graphql.Field{
+			"json": &graphql.Field{
+				Type: jsonRaw,
+			},
+			"nodes": &graphql.Field{
+				Type: jsonRaw,
+			},
+			"edges": &graphql.Field{
 				Type: jsonRaw,
 			},
 		},
 	},
 )
 
+/*
+var nodeType = graphql.NewObject(
+	graphql.ObjectConfig{
+		Name:        "Node Type",
+		Description: "Provenance Graph Node",
+		Fields: graphql.Fields{
+			"nodeType": &graphql.Field{
+				Type: graphql.String,
+			},
+			"uid": &graphql.Field{
+				Type: graphql.String,
+			},
+			"ID": &graphql.Field{
+				Type: graphql.String,
+			},
+			"type": &graphql.Field{
+				Type: graphql.String,
+			},
+			"name": &graphql.Field{
+				Type: graphql.String,
+			},
+			"startDate": &graphql.Field{
+				Type: graphql.String,
+			},
+			"endDate": &graphql.Field{
+				Type: graphql.String,
+			},
+			"uri": &graphql.Field{
+				Type: graphql.String,
+			},
+			"creationDate": &graphql.Field{
+				Type: graphql.String,
+			},
+		},
+	},
+)
+
+var edgeType = graphql.NewObject(
+	graphql.ObjectConfig{
+		Name:        "Edge Type",
+		Description: "Provenance Graph Edge",
+		Fields: graphql.Fields{
+			"edgeType": &graphql.Field{
+				Type: graphql.String,
+			},
+			"source": &graphql.Field{
+				Type: graphql.String,
+			},
+			"target": &graphql.Field{
+				Type: graphql.String,
+			},
+		},
+	},
+)
+*/
 var jsonRaw = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "JSON",
 	Description: "Raw JSON Byte Array",

@@ -1,11 +1,26 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
+	"reflect"
 
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/db"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/util"
 	"github.com/graphql-go/graphql"
+)
+
+const (
+	nodeTypeRoot              = "root"
+	nodeTypeEntity            = "entity"
+	nodeTypeAgent             = "agent"
+	nodeTypeActivity          = "activity"
+	edgeTypeWasGeneratedBy    = "wasGeneratedBy"
+	edgeTypeWasAssociatedWith = "wasAssociatedWith"
+	edgeTypeActedOnBehalfOf   = "actedOnBehalfOf"
+	edgeTypeWasAttributedTo   = "wasAttributedTo"
+	edgeTypeWasDerivedFrom    = "wasDerivedFrom"
+	edgeTypeUsed              = "used"
 )
 
 func resolveQueryEntity(dbClient *db.Client, p graphql.ResolveParams) (*util.Entity, error) {
@@ -88,6 +103,126 @@ func resolveProvGraph(dbClient *db.Client, p graphql.ResolveParams) (*util.Graph
 	if len(res.Graph) != 1 {
 		return nil, fmt.Errorf("%s is no valid graph root", id)
 	}
+	parseGraph(res.Graph[0])
 
 	return res.Graph[0], nil
+}
+
+func parseGraph(graph *util.Graph) error {
+	nodes := []util.Node{}
+	edges := []util.Edge{}
+
+	var v map[string]interface{}
+	err := json.Unmarshal(graph.RawMessage, &v)
+	if err != nil {
+		return err
+	}
+
+	reflectFields(&nodes, &edges, nodeTypeRoot, v)
+
+	graph.Nodes, err = json.Marshal(nodes)
+	if err != nil {
+		return err
+	}
+
+	graph.Edges, err = json.Marshal(edges)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func reflectFields(nodes *[]util.Node, edges *[]util.Edge, nodeType string, v map[string]interface{}) {
+	values := reflect.ValueOf(v)
+	node := make(util.Node)
+	node["nodeType"] = nodeType
+
+	id, ok := v["id"].(string)
+	if !ok {
+		return
+	}
+
+	iter := values.MapRange()
+	for iter.Next() {
+		key := iter.Key()
+		value := iter.Value()
+
+		if value.IsZero() {
+			continue
+		}
+
+		switch key.String() {
+		case edgeTypeWasGeneratedBy:
+			activity := value.Interface().([]interface{})[0].(map[string]interface{})
+
+			activityID, ok := activity["id"].(string)
+			if !ok {
+				return
+			}
+
+			*edges = append(*edges, drawEdge(id, activityID, edgeTypeWasGeneratedBy))
+			reflectFields(nodes, edges, nodeTypeActivity, activity)
+
+		case edgeTypeWasAssociatedWith:
+			agent := value.Interface().([]interface{})[0].(map[string]interface{})
+
+			agentID, ok := agent["id"].(string)
+			if !ok {
+				return
+			}
+
+			*edges = append(*edges, drawEdge(id, agentID, edgeTypeWasAssociatedWith))
+			reflectFields(nodes, edges, nodeTypeAgent, agent)
+
+		case edgeTypeActedOnBehalfOf:
+			agent := value.Interface().([]interface{})[0].(map[string]interface{})
+
+			agentID, ok := agent["id"].(string)
+			if !ok {
+				return
+			}
+
+			*edges = append(*edges, drawEdge(id, agentID, edgeTypeActedOnBehalfOf))
+			reflectFields(nodes, edges, nodeTypeAgent, agent)
+
+		case edgeTypeUsed:
+			entities := value.Interface().([]interface{})
+
+			for _, entity := range entities {
+				entityID, ok := entity.(map[string]interface{})["id"].(string)
+				if !ok {
+					return
+				}
+
+				*edges = append(*edges, drawEdge(id, entityID, edgeTypeUsed))
+				reflectFields(nodes, edges, nodeTypeEntity, entity.(map[string]interface{}))
+			}
+
+		case edgeTypeWasDerivedFrom:
+			entities := value.Interface().([]interface{})
+
+			for _, entity := range entities {
+				entityID, ok := entity.(map[string]interface{})["id"].(string)
+				if !ok {
+					return
+				}
+
+				*edges = append(*edges, drawEdge(id, entityID, edgeTypeWasDerivedFrom))
+				reflectFields(nodes, edges, nodeTypeEntity, entity.(map[string]interface{}))
+			}
+
+		default:
+			node[key.String()] = value.Interface().(string)
+		}
+	}
+	*nodes = append(*nodes, node)
+}
+
+func drawEdge(source string, target string, edgeType string) util.Edge {
+	return util.Edge{
+		Source:   source,
+		Target:   target,
+		EdgeType: edgeType,
+	}
 }
