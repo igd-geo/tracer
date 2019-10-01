@@ -8,18 +8,25 @@ import Drawer from '@material-ui/core/Drawer';
 import Tabs from '@material-ui/core/Tabs';
 import Tab from '@material-ui/core/Tab';
 import Box from '@material-ui/core/Box';
-import TextField from '@material-ui/core/TextField';
 import Grid from '@material-ui/core/Grid';
 import Container from '@material-ui/core/Container';
 import { makeStyles } from '@material-ui/core/styles';
+import InputBase from '@material-ui/core/InputBase';
+import SearchIcon from '@material-ui/icons/Search';
+import Paper from '@material-ui/core/Paper';
+import IconButton from '@material-ui/core/IconButton';
+import { connect } from 'react-redux';
 import MetadataViewer from './components/MetdadataViewer';
 import GraphViewer from './components/GraphViewer';
 import DetailViewer from './components/DetailViewer';
+import { setGraph } from './redux/actions';
 
-const drawerWidth = 420;
+
+const drawerWidth = '33vh';
 const useStyles = makeStyles((theme) => ({
   root: {
     display: 'flex',
+    height: '100vh',
   },
   appBar: {
     zIndex: theme.zIndex.drawer + 1,
@@ -27,29 +34,66 @@ const useStyles = makeStyles((theme) => ({
   drawer: {
     width: drawerWidth,
     flexShrink: 0,
+    overflow: 'hidden',
   },
   drawerPaper: {
     width: drawerWidth,
+    position: 'static',
+    overflow: 'hidden',
   },
   toolbar: theme.mixins.toolbar,
   content: {
     flexGrow: 1,
-    height: '100vh',
     oveflow: 'auto',
+    overflow: 'hidden',
   },
   container: {
     paddingTop: theme.spacing(4),
     paddingBottom: theme.spacing(4),
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
   },
-  textField: {
+  input: {
     marginLeft: theme.spacing(1),
-    marginRight: theme.spacing(1),
+    flex: 1,
+  },
+  iconButton: {
+    padding: 10,
+  },
+  searchRoot: {
+    padding: '2px 4px',
+    display: 'flex',
+    alignItems: 'center',
     width: 200,
+    marginRight: theme.spacing(5),
+  },
+  flexContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    flexGrow: 1,
+  },
+  tab: {
+    flexGrow: 1,
+  },
+  tabContent: {
+    height: '100%',
+  },
+  tabBox: {
+    height: '100%',
+    paddingBottom: '50px',
   },
 }));
 
+function a11yProps(index) {
+  return {
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
+  };
+}
 
 function TabPanel(props) {
+  const classes = useStyles();
   const {
     children, value, index, ...other
   } = props;
@@ -63,38 +107,80 @@ function TabPanel(props) {
       aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
-      <Box p={3}>{children}</Box>
+      <Box p={3} className={classes.tabBox}>
+        {children}
+        {' '}
+      </Box>
     </Typography>
   );
 }
 
-TabPanel.propTypes = {
-  children: PropTypes.node,
-  index: PropTypes.any.isRequired,
-  value: PropTypes.any.isRequired,
-};
-
-function a11yProps(index) {
-  return {
-    id: `simple-tab-${index}`,
-    'aria-controls': `simple-tabpanel-${index}`,
-  };
-}
-
-function App() {
+function App(props) {
   const classes = useStyles();
   const [value, setValue] = React.useState(0);
-  const [values, setValues] = React.useState({
-    name: '',
-  });
+  const [id, setID] = React.useState('');
+  const { dispatchGraph } = props;
 
-  function handleTabChange(event, newValue) {
-    setValue(newValue);
-  }
+  const handleTabChange = (event, newValue) => setValue(newValue);
 
-  const handleIdChange = (name) => (event) => {
-    setValues({ ...values, [name]: event.target.value });
+  const handleInputChange = (event) => {
+    setID(event.target.value);
   };
+
+  const handleClick = () => {
+    const newGraph = {
+      nodes: [
+        {
+          nodeType: 'root',
+          id: 'doc-2',
+          uri: 'google.de',
+          title: 'Document 2',
+          creationDate: '2016-06-20',
+          type: 'document',
+        },
+        {
+          nodeType: 'entity',
+          id: 'doc-1',
+          uri: 'google.de',
+          title: 'Document 1',
+          creationDate: '2016-06-19',
+          type: 'document',
+        },
+        {
+          nodeType: 'activity',
+          id: 'act',
+          name: 'Activity',
+          startDate: '2016-06-19',
+          endDate: '2016-06-19',
+          type: 'conversion',
+        },
+        {
+          nodeType: 'agent',
+          id: 'agent',
+          name: 'Activity',
+          type: 'conversion',
+        },
+        {
+          nodeType: 'agent',
+          id: 'supervisor',
+          name: 'Activity',
+          type: 'conversion',
+        },
+      ],
+      edges: [
+        { edgeType: 'wasGeneratedBy', source: 'doc-2', target: 'act' },
+        { edgeType: 'wasDerivedFrom', source: 'doc-2', target: 'doc-1' },
+        { edgeType: 'wasAssociatedWith', source: 'act', target: 'agent' },
+        { edgeType: 'actedOnBehalfOf', source: 'agent', target: 'supervisor' },
+        { edgeType: 'wasAttributedTo', source: 'doc-2', target: 'agent' },
+        { edgeType: 'used', source: 'act', target: 'doc-1' },
+      ],
+      activeNode: { name: '' },
+    };
+    dispatchGraph(newGraph);
+    console.log(id);
+  };
+
   return (
     <div className={classes.root}>
       <CssBaseline />
@@ -119,30 +205,32 @@ function App() {
       <main className={classes.content}>
         <div className={classes.toolbar} />
         <Container maxWidth="xl" className={classes.container}>
-          <Grid container direction="column" spacing={3}>
+          <Grid container direction="column" spacing={3} className={classes.flexContent}>
             <Grid item>
               <Toolbar>
-                <TextField
-                  id="standard-name"
-                  label="ID"
-                  className={classes.textField}
-                  value={values.name}
-                  onChange={handleIdChange('name')}
-                  margin="normal"
-                  variant="filled"
-                />
+                <Paper className={classes.searchRoot}>
+                  <InputBase
+                    className={classes.input}
+                    placeholder="Document ID"
+                    inputProps={{ 'aria-label': 'search document id' }}
+                    onChange={handleInputChange}
+                  />
+                  <IconButton className={classes.iconButton} aria-label="search" onClick={handleClick}>
+                    <SearchIcon />
+                  </IconButton>
+                </Paper>
                 <Tabs value={value} onChange={handleTabChange} aria-label="simple tabs example">
                   <Tab label="Graph" {...a11yProps(0)} />
                   <Tab label="Metadata" {...a11yProps(1)} />
                 </Tabs>
               </Toolbar>
             </Grid>
-            <Grid item>
-              <TabPanel value={value} index={0}>
-                <GraphViewer />
+            <Grid item className={classes.flexContent}>
+              <TabPanel value={value} index={0} className={classes.tab}>
+                <GraphViewer className={classes.tabContent} />
               </TabPanel>
-              <TabPanel value={value} index={1}>
-                <MetadataViewer />
+              <TabPanel value={value} index={1} className={classes.tab}>
+                <MetadataViewer className={classes.tabContent} />
               </TabPanel>
             </Grid>
           </Grid>
@@ -152,4 +240,22 @@ function App() {
   );
 }
 
-export default App;
+
+const mapDispatchToProps = (dispatch) => ({
+  dispatchGraph: (graph) => dispatch(setGraph(graph)),
+});
+
+TabPanel.propTypes = {
+  children: PropTypes.node,
+  index: PropTypes.any.isRequired,
+  value: PropTypes.any.isRequired,
+};
+
+App.propTypes = {
+  dispatchGraph: PropTypes.func,
+};
+
+export default connect(
+  null,
+  mapDispatchToProps,
+)(App);

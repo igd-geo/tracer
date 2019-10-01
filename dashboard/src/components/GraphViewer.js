@@ -10,15 +10,68 @@ import { setActiveNode } from '../redux/actions';
 const useStyles = makeStyles(() => ({
   paper: {
     textAlign: 'center',
-    height: '75vh',
+    overflow: 'hidden',
+    height: '100%',
+  },
+  grid: {
+    height: '100%',
+  },
+  gridContainer: {
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
   },
 }));
 
-function GraphViewer(props) {
-  const radius = 30;
-  const classes = useStyles();
-  const { nodes, edges, dispatchActiveNode } = props;
+const graphWidth = '100%';
+const graphHeight = '100%';
+const radius = 30;
 
+function GraphViewer(props) {
+  const { nodes, edges, dispatchActiveNode } = props;
+  const classes = useStyles();
+
+  const defaultColor = 'black';
+  const highlightColor = 'orange';
+
+  const rootColor = 'blue';
+  const entityColor = 'yellow';
+  const activityColor = 'green';
+  const agentColor = 'red';
+
+  const nodeColor = (type) => {
+    switch (type) {
+      case 'root':
+        return rootColor;
+      case 'entity':
+        return entityColor;
+      case 'activity':
+        return activityColor;
+      case 'agent':
+        return agentColor;
+      default:
+        return defaultColor;
+    }
+  };
+
+  const edgeColor = (type) => {
+    switch (type) {
+      case 'wasDerivedFrom':
+        return entityColor;
+      case 'wasGeneratedBy':
+        return activityColor;
+      case 'wasAssociatedWith':
+        return agentColor;
+      case 'wasAttributedTo':
+        return agentColor;
+      case 'actedOnBehalfOf':
+        return agentColor;
+      case 'used':
+        return entityColor;
+      default:
+        return defaultColor;
+    }
+  };
 
   useEffect(() => {
     const svg = d3.select('.graphSVG');
@@ -27,44 +80,41 @@ function GraphViewer(props) {
       svg.selectAll('*').remove();
     }
     const { height, width } = svg.node().getBoundingClientRect();
-    const graph = {
-      nodes,
-      edges,
-    };
+
 
     const simulation = d3.forceSimulation()
-      .nodes(graph.nodes);
-    simulation
+      .nodes(nodes)
       .force('charge', d3.forceManyBody())
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collide', d3.forceCollide().radius(50));
-    simulation.force('links', d3.forceLink(edges).id((d) => d.name));
+      .force('collide', d3.forceCollide().radius(4 * radius))
+      .force('links', d3.forceLink(edges).id((d) => d.id));
 
     const link = svg.append('g')
       .attr('class', 'links')
       .selectAll('line')
-      .data(graph.edges)
+      .data(edges)
       .enter()
-      .append('line');
+      .append('line')
+      .style('stroke', (d) => edgeColor(d.edgeType));
 
     const node = svg.append('g')
       .attr('class', 'nodes')
       .selectAll('circle')
-      .data(graph.nodes)
+      .data(nodes)
       .enter()
       .append('circle')
       .attr('r', radius)
-      .attr('fill', 'red')
+      .attr('fill', (d) => nodeColor(d.nodeType))
       .on('click', (clickedNode) => {
         dispatchActiveNode(clickedNode.id);
       })
       .on('mouseover', () => {
-        d3.select(d3.event.target).transition().duration(50).attr('fill', 'orange');
+        d3.select(d3.event.target).transition().duration(50).attr('fill', highlightColor);
         d3.select(d3.event.target).style('cursor', 'pointer');
       })
       .on('mouseout', () => {
         d3.select(d3.event.target).style('cursor', 'default');
-        d3.select(d3.event.target).transition().duration(50).attr('fill', 'red');
+        d3.select(d3.event.target).transition().duration(50).attr('fill', (d) => nodeColor(d.nodeType));
       });
 
     const tickActions = () => {
@@ -90,10 +140,11 @@ function GraphViewer(props) {
       justify="center"
       alignItems="stretch"
       spacing={3}
+      className={classes.gridContainer}
     >
-      <Grid item xs={12}>
+      <Grid item xs={12} className={classes.grid}>
         <Paper className={classes.paper}>
-          <svg className="graphSVG" height="800px" width="100%" />
+          <svg className="graphSVG" height={graphHeight} width={graphWidth} />
         </Paper>
       </Grid>
     </Grid>
@@ -110,10 +161,9 @@ const mapDispatchToProps = (dispatch) => ({
   dispatchActiveNode: (node) => dispatch(setActiveNode(node)),
 });
 
-
 GraphViewer.propTypes = {
-  nodes: PropTypes.any,
-  edges: PropTypes.any,
+  nodes: PropTypes.array,
+  edges: PropTypes.array,
   dispatchActiveNode: PropTypes.func,
 };
 
