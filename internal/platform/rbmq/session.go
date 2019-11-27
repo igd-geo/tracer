@@ -1,4 +1,4 @@
-package broker
+package rbmq
 
 import (
 	"fmt"
@@ -15,14 +15,30 @@ type Session struct {
 	conn     *amqp.Connection
 }
 
-// New returns a new Session
-func New(url string, msgChan chan<- *util.Entity, exchange string, routingKey string) *Session {
+type Broker struct {
+	conn *amqp.Connection
+}
+
+func NewBroker(url string) *Broker {
 	conn, err := amqp.Dial(url)
 	failOnError(err, "Failed to connect to RabbitMQ")
+	return &Broker{
+		conn: conn,
+	}
+}
+
+// NewSession returns a new Session
+func (b *Broker) NewSession(msgChan chan<- *util.Entity, exchange string, exchangeType string) *Session {
 	return &Session{
-		consumer: newConsumer(conn, url, msgChan),
-		producer: newProducer(conn, url, exchange, routingKey),
-		conn:     conn,
+		consumer: newConsumer(b.conn, msgChan),
+		producer: newProducer(b.conn, exchange, exchangeType),
+	}
+}
+
+// NewProducerOnly returns a new Session without a consumer
+func (b *Broker) NewProducerOnlySession(exchange string, exchangeType string) *Session {
+	return &Session{
+		producer: newProducer(b.conn, exchange, exchangeType),
 	}
 }
 
@@ -41,7 +57,11 @@ func (s *Session) Shutdown() error {
 		return err
 	}
 
-	if err := s.conn.Close(); err != nil {
+	return nil
+}
+
+func (b *Broker) Close() error {
+	if err := b.conn.Close(); err != nil {
 		return fmt.Errorf("AMQP connection close error: %s", err)
 	}
 	return nil

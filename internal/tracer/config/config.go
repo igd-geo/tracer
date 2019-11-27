@@ -26,6 +26,7 @@ const (
 type Config struct {
 	DB             string
 	Broker         string
+	LogExchange    string
 	BatchSizeLimit int
 	BatchTimeout   int
 }

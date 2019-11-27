@@ -4,12 +4,14 @@ import (
 	"encoding/xml"
 )
 
+/*
 type metadataJSON struct {
 	Contact contact
 }
 
 type contact struct {
 }
+*/
 
 type metadataXML struct {
 	XMLName        xml.Name `xml:"MD_Metadata"`

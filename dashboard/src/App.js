@@ -127,57 +127,26 @@ function App(props) {
     setID(event.target.value);
   };
 
+  const buildGraph = (data) => ({
+    nodes: data.nodes,
+    edges: data.edges,
+  });
+
   const handleClick = () => {
-    const newGraph = {
-      nodes: [
-        {
-          nodeType: 'root',
-          id: 'doc-2',
-          uri: 'google.de',
-          title: 'Document 2',
-          creationDate: '2016-06-20',
-          type: 'document',
-        },
-        {
-          nodeType: 'entity',
-          id: 'doc-1',
-          uri: 'google.de',
-          title: 'Document 1',
-          creationDate: '2016-06-19',
-          type: 'document',
-        },
-        {
-          nodeType: 'activity',
-          id: 'act',
-          name: 'Activity',
-          startDate: '2016-06-19',
-          endDate: '2016-06-19',
-          type: 'conversion',
-        },
-        {
-          nodeType: 'agent',
-          id: 'agent',
-          name: 'Activity',
-          type: 'conversion',
-        },
-        {
-          nodeType: 'agent',
-          id: 'supervisor',
-          name: 'Activity',
-          type: 'conversion',
-        },
-      ],
-      edges: [
-        { edgeType: 'wasGeneratedBy', source: 'doc-2', target: 'act' },
-        { edgeType: 'wasDerivedFrom', source: 'doc-2', target: 'doc-1' },
-        { edgeType: 'wasAssociatedWith', source: 'act', target: 'agent' },
-        { edgeType: 'actedOnBehalfOf', source: 'agent', target: 'supervisor' },
-        { edgeType: 'wasAttributedTo', source: 'doc-2', target: 'agent' },
-        { edgeType: 'used', source: 'act', target: 'doc-1' },
-      ],
-      activeNode: { name: '' },
-    };
-    dispatchGraph(newGraph);
+    fetch('http://localhost:1234/api?query={graph(id:"entity_123456789"){json nodes edges}}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+    })
+      .then((r) => r.json())
+      .then((body) => {
+        const graph = buildGraph(body.data.graph);
+        dispatchGraph(graph);
+      });
+
+    // used for search field
     console.log(id);
   };
 

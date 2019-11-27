@@ -5,8 +5,8 @@ import (
 	"os"
 	"os/signal"
 
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/broker"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/db"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/rbmq"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/tracer"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/tracer/config"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/util"
@@ -18,13 +18,16 @@ func main() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
 
-	config := config.New()
+	conf := config.New()
 
 	deliveries := make(chan *util.Entity)
-	broker := broker.New(config.Broker, deliveries, "notifications", "topic")
-	db := db.NewClient(config.DB)
 
-	tracer := tracer.Setup(config, db, broker, deliveries)
+	msgBroker := rbmq.NewBroker(conf.Broker)
+
+	provSession := msgBroker.NewSession(deliveries, "notifications", "topic")
+	db := db.NewClient(conf.DB)
+
+	tracer := tracer.Setup(conf, db, provSession, deliveries)
 	tracer.Listen()
 
 	<-signalChan

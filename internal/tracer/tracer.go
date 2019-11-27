@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/broker"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/db"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/rbmq"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/tracer/config"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/util"
 )
@@ -14,14 +14,10 @@ import (
 // Tracer is a provenance service.
 type Tracer struct {
 	deliveries <-chan *util.Entity
-	rbSession  *broker.Session
+	rbmq       *rbmq.Session
 	db         *db.Client
-	config     *config.Config
+	conf       *config.Config
 	cache      cache
-}
-
-type mutation struct {
-	entities []*util.Entity
 }
 
 type cache struct {
@@ -29,11 +25,11 @@ type cache struct {
 }
 
 // Setup sets up the tracer service and initializes all required components
-func Setup(config *config.Config, db *db.Client, broker *broker.Session, deliveries chan *util.Entity) *Tracer {
+func Setup(conf *config.Config, db *db.Client, rbSession *rbmq.Session, deliveries chan *util.Entity) *Tracer {
 	tracer := Tracer{
-		config:     config,
+		conf:       conf,
 		db:         db,
-		rbSession:  broker,
+		rbmq:       rbSession,
 		deliveries: deliveries,
 		cache: cache{
 			items: make(map[string]string),
@@ -42,16 +38,16 @@ func Setup(config *config.Config, db *db.Client, broker *broker.Session, deliver
 	return &tracer
 }
 
-// Cleanup initlializes RabbitMQ Shutdown.
+// Cleanup initializes RabbitMQ Shutdown.
 func (tracer *Tracer) Cleanup() error {
-	return tracer.rbSession.Shutdown()
+	return tracer.rbmq.Shutdown()
 }
 
 // Listen starts the tracer service.
 func (tracer *Tracer) Listen() {
 	derivatives := make(chan *util.Entity)
 	commit := make(chan struct{})
-	batchTimeout := time.Duration(tracer.config.BatchTimeout) * time.Millisecond
+	batchTimeout := time.Duration(tracer.conf.BatchTimeout) * time.Millisecond
 
 	go func() {
 		for {
@@ -78,8 +74,8 @@ func (tracer *Tracer) handleDerivatives(derivatives <-chan *util.Entity, commit 
 			if err != nil {
 				log.Println(err)
 			}
-			if txn.Size == tracer.config.BatchSizeLimit {
-				log.Println("batch full, commiting...")
+			if txn.Size == tracer.conf.BatchSizeLimit {
+				log.Println("batch full, committing...")
 				tracer.commitTransaction(txn)
 				txn = tracer.db.NewTransaction()
 				tracer.cache.items = make(map[string]string)
@@ -88,7 +84,7 @@ func (tracer *Tracer) handleDerivatives(derivatives <-chan *util.Entity, commit 
 			if len(txn.Mutation) == 0 {
 				continue
 			}
-			log.Println("no new delivery within time window, commiting...")
+			log.Println("no new delivery within time window, committing...")
 			tracer.commitTransaction(txn)
 			txn = tracer.db.NewTransaction()
 			tracer.cache.items = make(map[string]string)
@@ -107,36 +103,31 @@ func (tracer *Tracer) commitTransaction(txn *db.Transaction) {
 }
 
 func (tracer *Tracer) prepareActivity(activity *util.Activity, query *db.Query) bool {
-	missed := false
-
 	if uid, ok := tracer.cache.get(activity.ID); ok {
 		activity.UID = uid
 		query.SetVariable(db.VariableActivityID, "")
-		return missed
+		return false
 	} else if activity.IsBatch {
 		query.SetVariable(db.VariableActivityID, activity.ID)
-		missed = true
+		return true
 	}
 
-	return missed
+	return false
 }
 
 func (tracer *Tracer) prepareAgent(agent *util.Agent, query *db.Query, isSupervisor bool) bool {
-	missed := false
-
 	if uid, ok := tracer.cache.get(agent.ID); ok {
 		agent.UID = uid
-		return missed
+		return false
 	}
 	if isSupervisor {
 		query.SetVariable(db.VariableSupervisorID, agent.ID)
 	} else {
 		query.SetVariable(db.VariableAgentID, agent.ID)
 	}
-	missed = true
-
-	return missed
+	return true
 }
+
 func (tracer *Tracer) prepare(derivative *util.Entity, txn *db.Transaction) error {
 	activity := derivative.WasGeneratedBy[0]
 	agent := derivative.WasGeneratedBy[0].WasAssociatedWith[0]

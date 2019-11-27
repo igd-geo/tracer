@@ -8,6 +8,7 @@ import (
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/api"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/api/config"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/db"
+	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/rbmq"
 )
 
 func main() {
@@ -16,11 +17,15 @@ func main() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
 
-	config := config.New()
+	conf := config.New()
 
-	db := db.NewClient(config.DB)
+	msgBroker := rbmq.NewBroker(conf.Broker)
 
-	server := api.NewServer(config, db)
+	httpDummySession := msgBroker.NewProducerOnlySession("notifications", "topic")
+
+	db := db.NewClient(conf.DB)
+
+	server := api.NewServer(conf, db, httpDummySession)
 	go server.Run()
 
 	<-signalChan
