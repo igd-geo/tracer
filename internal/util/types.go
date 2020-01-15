@@ -39,7 +39,7 @@ type Agent struct {
 	ID              string          `json:"id,omitempty"`
 	Type            string          `json:"type,omitempty"`
 	Name            string          `json:"name,omitempty"`
-	Test            string          `json:"test,omitempty"`
+	Description     string          `json:"description,omitempty"`
 	Data            json.RawMessage `json:"data,omitempty"`
 	Graph           json.RawMessage `json:"graph,omitempty"`
 	ActedOnBehalfOf []*Agent        `json:"actedOnBehalfOf,omitempty"`

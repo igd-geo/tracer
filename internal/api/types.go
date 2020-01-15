@@ -66,6 +66,7 @@ var agentType = graphql.NewObject(
 		},
 	},
 )
+
 var activityType = graphql.NewObject(
 	graphql.ObjectConfig{
 		Name:        "Activity",

@@ -1,8 +1,10 @@
 package tracer
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/db"
@@ -11,13 +13,18 @@ import (
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/util"
 )
 
+const mockServerURL = "http://localhost:8787"
+
 // Tracer is a provenance service.
 type Tracer struct {
-	deliveries <-chan *util.Entity
-	rbmq       *rbmq.Session
-	db         *db.Client
-	conf       *config.Config
-	cache      cache
+	deliveries    <-chan *util.Entity
+	rbmq          *rbmq.Session
+	db            *db.Client
+	conf          *config.Config
+	cache         cache
+	batchTimes    []time.Duration
+	httpTimes     []time.Duration
+	mutationTimes []time.Duration
 }
 
 type cache struct {
@@ -66,10 +73,14 @@ func (tracer *Tracer) Listen() {
 }
 
 func (tracer *Tracer) handleDerivatives(derivatives <-chan *util.Entity, commit <-chan struct{}) {
+	first := true
 	txn := tracer.db.NewTransaction()
 	for {
 		select {
 		case derivative := <-derivatives:
+			if first {
+				txn.StartTime = time.Now()
+			}
 			err := tracer.prepare(derivative, txn)
 			if err != nil {
 				log.Println(err)
@@ -93,16 +104,57 @@ func (tracer *Tracer) handleDerivatives(derivatives <-chan *util.Entity, commit 
 }
 
 func (tracer *Tracer) commitTransaction(txn *db.Transaction) {
-	assigned, err := tracer.db.RunMutation(&txn.Mutation)
+	mutationStart := time.Now()
+	_, err := tracer.db.RunMutation(&txn.Mutation)
 	if err != nil {
 		log.Println(err)
 	} else {
-		log.Printf("%+v", assigned)
+		//log.Printf("%+v", assigned)
 		log.Printf("successfully commited %v items\n", txn.Size)
+		tracer.mutationTimes = append(tracer.mutationTimes, time.Since(mutationStart))
+		tracer.batchTimes = append(tracer.batchTimes, time.Since(txn.StartTime))
 	}
+
+	var totalBatch time.Duration = 0
+	var totalHTTP time.Duration = 0
+	var totalMutation time.Duration = 0
+	batches := 0
+	httpReqs := 0
+	mutations := 0
+
+	for count, dur := range tracer.batchTimes {
+		totalBatch = totalBatch + dur
+		batches = count + 1
+	}
+
+	for count, dur := range tracer.mutationTimes {
+		totalMutation = totalMutation + dur
+		mutations = count + 1
+	}
+
+	for count, dur := range tracer.httpTimes {
+		totalHTTP = totalHTTP + dur
+		httpReqs = count + 1
+	}
+
+	avgBatch := (float64(totalBatch.Nanoseconds()) / float64(batches)) / float64(time.Millisecond)
+	avgHTTP := (float64(totalHTTP.Nanoseconds()) / float64(httpReqs)) / float64(time.Millisecond)
+	avgMut := (float64(totalMutation.Nanoseconds()) / float64(mutations)) / float64(time.Millisecond)
+
+	fmt.Printf("\nTotal Time: %v\n", totalBatch)
+	//fmt.Printf("Batch Durations [%d batches]: %v\n", batches, tracer.batchTimes)
+	fmt.Printf("Average Batch Duration [%d batches]: %f\n", batches, avgBatch)
+	fmt.Printf("Total Mutation Request Time: %v\n", totalMutation)
+	fmt.Printf("Average Mutation Request Duration: %v\n", avgMut)
+	fmt.Printf("Total HTTP Request Time: %v\n", totalHTTP)
+	fmt.Printf("Average HTTP Request Duration [%d requests]: %v\n\n\n", httpReqs, avgHTTP)
 }
 
 func (tracer *Tracer) prepareActivity(activity *util.Activity, query *db.Query) bool {
+	for _, entity := range activity.Used {
+		tracer.prepareUsedEntities(entity)
+	}
+
 	if uid, ok := tracer.cache.get(activity.ID); ok {
 		activity.UID = uid
 		query.SetVariable(db.VariableActivityID, "")
@@ -111,8 +163,27 @@ func (tracer *Tracer) prepareActivity(activity *util.Activity, query *db.Query) 
 		query.SetVariable(db.VariableActivityID, activity.ID)
 		return true
 	}
-
 	return false
+}
+
+func (tracer *Tracer) prepareUsedEntities(entity *util.Entity) {
+	entityUID := fmt.Sprintf("_:%s", entity.ID)
+
+	if uid, ok := tracer.cache.get(entity.ID); ok {
+		entityUID = uid
+	} else {
+		query := db.NewQuery(db.QueryEntityUIDByID)
+		query.SetVariable(db.VariableEntityID, entity.ID)
+		result, _ := tracer.db.RunQueryWithVars(query)
+
+		if len(result.Entity) == 1 {
+			entityUID = result.Entity[0].UID
+		}
+
+		tracer.cache.set(entity.ID, entityUID)
+	}
+
+	entity.UID = entityUID
 }
 
 func (tracer *Tracer) prepareAgent(agent *util.Agent, query *db.Query, isSupervisor bool) bool {
@@ -146,6 +217,7 @@ func (tracer *Tracer) prepare(derivative *util.Entity, txn *db.Transaction) erro
 		}
 	}
 
+	derivative.WasDerivedFrom = activity.Used
 	txn.Mutation = append(txn.Mutation, derivative)
 	txn.Size++
 
@@ -169,13 +241,24 @@ func (tracer *Tracer) fetchAndCacheUids(derivative *util.Entity, query *db.Query
 	if len(result.Activity) == 1 {
 		activityUID = result.Activity[0].UID
 	}
+	// else {
+	//fetchActivityInfoFromSysService(activity)
+	//}
 
 	if len(result.Agent) == 1 {
 		agentUID = result.Agent[0].UID
+	} else {
+		fetchStart := time.Now()
+		fetchAgentInfoFromSysService(agent, false)
+		tracer.httpTimes = append(tracer.httpTimes, time.Since(fetchStart))
 	}
 
 	if len(result.Supervisor) == 1 {
 		supervisorUID = result.Supervisor[0].UID
+	} else {
+		fetchStart := time.Now()
+		fetchAgentInfoFromSysService(agent, true)
+		tracer.httpTimes = append(tracer.httpTimes, time.Since(fetchStart))
 	}
 
 	activity.UID = activityUID
@@ -196,4 +279,61 @@ func (c *cache) get(key string) (string, bool) {
 
 func (c *cache) set(key string, value string) {
 	c.items[key] = value
+}
+
+func fetchAgentInfoFromSysService(agent *util.Agent, isSupervisor bool) {
+	type mockServiceStruct struct {
+		ID          string
+		Name        string
+		Description string
+		Type        string
+		CreatedBy   string
+	}
+
+	type mockUserStruct struct {
+		ID   string
+		Name string
+		Type string
+	}
+	if isSupervisor {
+		supervisor := agent.ActedOnBehalfOf[0]
+		url := fmt.Sprintf("%s/user/%s", mockServerURL, supervisor.ID)
+		res, _ := http.Get(url)
+		mockUser := mockUserStruct{}
+		json.NewDecoder(res.Body).Decode(&mockUser)
+
+		supervisor.Name = mockUser.Name
+		supervisor.Type = mockUser.Type
+	} else {
+		url := fmt.Sprintf("%s/service/%s", mockServerURL, agent.ID)
+		res, err := http.Get(url)
+		if err != nil {
+			fmt.Println(err)
+		}
+		defer res.Body.Close()
+
+		mockService := mockServiceStruct{}
+		json.NewDecoder(res.Body).Decode(&mockService)
+
+		agent.Name = mockService.Name
+		agent.Type = mockService.Type
+		agent.Description = mockService.Type
+		agent.ActedOnBehalfOf[0].ID = mockService.CreatedBy
+	}
+}
+
+func fetchActivityInfoFromSysService(activity *util.Activity) {
+	type mockProcessStruct struct {
+		ID         string
+		InstanceOf string
+		StartDate  string
+		EndDate    string
+		Input      string
+		Output     string
+		Status     string
+	}
+
+	res, _ := http.Get(fmt.Sprintf("%s/user/%s", activity.ID, mockServerURL))
+	mockProcess := mockProcessStruct{}
+	json.NewDecoder(res.Body).Decode(&mockProcess)
 }

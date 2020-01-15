@@ -6,6 +6,46 @@ import (
 )
 
 func initGraphQL(db *db.Client) graphql.Schema {
+	entityType.AddFieldConfig(
+		"wasDerivedFrom",
+		&graphql.Field{
+			Type:    graphql.NewList(entityType),
+			Resolve: resolveWasDerivedFrom,
+		},
+	)
+
+	entityType.AddFieldConfig(
+		"wasGeneratedBy",
+		&graphql.Field{
+			Type:    activityType,
+			Resolve: resolveWasGeneratedBy,
+		},
+	)
+
+	agentType.AddFieldConfig(
+		"actedOnBehalfOf",
+		&graphql.Field{
+			Type:    agentType,
+			Resolve: resolveActedOnBehalfOf,
+		},
+	)
+
+	activityType.AddFieldConfig(
+		"wasAssociatedWith",
+		&graphql.Field{
+			Type:    agentType,
+			Resolve: resolveWasAssociatedWith,
+		},
+	)
+
+	activityType.AddFieldConfig(
+		"used",
+		&graphql.Field{
+			Type:    graphql.NewList(entityType),
+			Resolve: resolveUsed,
+		},
+	)
+
 	var queryType = graphql.NewObject(
 		graphql.ObjectConfig{
 			Name: "Query",
@@ -18,9 +58,10 @@ func initGraphQL(db *db.Client) graphql.Schema {
 							Type: graphql.String,
 						},
 					},
-					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-						return resolveQueryEntity(db, p)
-					},
+					Resolve: resolveQueryEntity,
+					//Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					//return resolveQueryEntity(db, p)
+					//},
 				},
 				"agent": &graphql.Field{
 					Type:        agentType,
@@ -30,9 +71,10 @@ func initGraphQL(db *db.Client) graphql.Schema {
 							Type: graphql.String,
 						},
 					},
-					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-						return resolveQueryAgent(db, p)
-					},
+					Resolve: resolveQueryAgent,
+					// Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					// 	return resolveQueryAgent(db, p)
+					// },
 				},
 				"activity": &graphql.Field{
 					Type:        activityType,
@@ -42,9 +84,10 @@ func initGraphQL(db *db.Client) graphql.Schema {
 							Type: graphql.String,
 						},
 					},
-					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-						return resolveQueryActivity(db, p)
-					},
+					Resolve: resolveQueryActivity,
+					// Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					// 	return resolveQueryActivity(db, p)
+					// },
 				},
 				"graph": &graphql.Field{
 					Type:        graphType,
@@ -54,9 +97,10 @@ func initGraphQL(db *db.Client) graphql.Schema {
 							Type: graphql.String,
 						},
 					},
-					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-						return resolveProvGraph(db, p)
-					},
+					Resolve: resolveProvGraph,
+					// Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					// 	return resolveProvGraph(db, p)
+					// },
 				},
 			},
 		})

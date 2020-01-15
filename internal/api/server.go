@@ -1,10 +1,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/api/config"
 	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/db"
@@ -19,6 +22,8 @@ type Server struct {
 	db   *db.Client
 	rbmq *rbmq.Session
 }
+
+type dbConnectionKey string
 
 // NewServer returns a new Server with a given conf and database connection
 func NewServer(conf *config.Config, db *db.Client, rbSession *rbmq.Session) *Server {
@@ -36,7 +41,7 @@ func (s *Server) Run() {
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		setupCORS(&w)
 		w.Header().Set("Content-Type", "application/json")
-		result := executeQuery(r.URL.Query().Get("query"), schema)
+		result := executeQuery(r.URL.Query().Get("query"), schema, s.db)
 		json.NewEncoder(w).Encode(result)
 	})
 
@@ -67,18 +72,23 @@ func (s *Server) Run() {
 func setupCORS(w *http.ResponseWriter) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, " +
+	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, "+
 		"Accept-Encoding, X-CSRF-Token, Authorization")
 }
 
-func executeQuery(query string, schema graphql.Schema) *graphql.Result {
+func executeQuery(query string, schema graphql.Schema, db *db.Client) *graphql.Result {
+	queryStart := time.Now()
+	dbKey := dbConnectionKey("db")
+
 	result := graphql.Do(graphql.Params{
 		Schema:        schema,
 		RequestString: query,
+		Context:       context.WithValue(context.Background(), dbKey, db),
 	})
 	if len(result.Errors) > 0 {
 		log.Printf("wrong result, unexpected errors: %v", result.Errors)
 	}
+	fmt.Printf("Query Duration: %v\n", time.Since(queryStart))
 	return result
 }
 

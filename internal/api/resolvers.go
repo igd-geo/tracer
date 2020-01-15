@@ -23,16 +23,16 @@ const (
 	edgeTypeUsed              = "used"
 )
 
-func resolveQueryEntity(dbClient *db.Client, p graphql.ResolveParams) (*util.Entity, error) {
+func resolveQueryEntity(p graphql.ResolveParams) (interface{}, error) {
 	id, ok := p.Args["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf(`field "id" not set`)
 	}
 
-	query := db.NewQuery(db.QueryEntityUIDByID)
+	query := db.NewQuery(db.QueryEntityFullByID)
 	query.SetVariable(db.VariableEntityID, id)
 
-	res, err := dbClient.RunQueryWithVars(query)
+	res, err := p.Context.Value(dbConnectionKey("db")).(*db.Client).RunQueryWithVars(query)
 	if err != nil {
 		return nil, err
 	}
@@ -44,16 +44,16 @@ func resolveQueryEntity(dbClient *db.Client, p graphql.ResolveParams) (*util.Ent
 	return res.Entity[0], nil
 }
 
-func resolveQueryAgent(dbClient *db.Client, p graphql.ResolveParams) (*util.Agent, error) {
+func resolveQueryAgent(p graphql.ResolveParams) (interface{}, error) {
 	id, ok := p.Args["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf(`field "id" not set`)
 	}
 
-	query := db.NewQuery(db.QueryAgentUIDByID)
+	query := db.NewQuery(db.QueryAgentFullByID)
 	query.SetVariable(db.VariableAgentID, id)
 
-	res, err := dbClient.RunQueryWithVars(query)
+	res, err := p.Context.Value(dbConnectionKey("db")).(*db.Client).RunQueryWithVars(query)
 	if err != nil {
 		return nil, err
 	}
@@ -65,16 +65,16 @@ func resolveQueryAgent(dbClient *db.Client, p graphql.ResolveParams) (*util.Agen
 	return res.Agent[0], nil
 }
 
-func resolveQueryActivity(dbClient *db.Client, p graphql.ResolveParams) (*util.Activity, error) {
+func resolveQueryActivity(p graphql.ResolveParams) (interface{}, error) {
 	id, ok := p.Args["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf(`field "id" not set`)
 	}
 
-	query := db.NewQuery(db.QueryActivityUIDByID)
+	query := db.NewQuery(db.QueryActivityFullByID)
 	query.SetVariable(db.VariableActivityID, id)
 
-	res, err := dbClient.RunQueryWithVars(query)
+	res, err := p.Context.Value(dbConnectionKey("db")).(*db.Client).RunQueryWithVars(query)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,106 @@ func resolveQueryActivity(dbClient *db.Client, p graphql.ResolveParams) (*util.A
 	return res.Activity[0], nil
 }
 
-func resolveProvGraph(dbClient *db.Client, p graphql.ResolveParams) (*util.Graph, error) {
+func resolveWasGeneratedBy(p graphql.ResolveParams) (interface{}, error) {
+	entity, ok := p.Source.(*util.Entity)
+	if !ok {
+		return nil, fmt.Errorf(`nested entity "id" not set`)
+	}
+
+	query := db.NewQuery(db.QueryWasGeneratedBy)
+	query.SetVariable(db.VariableEntityID, entity.UID)
+	res, err := p.Context.Value(dbConnectionKey("db")).(*db.Client).RunQueryWithVars(query)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res.Activity) != 1 {
+		return nil, fmt.Errorf("WasGeneratedBy not found for %s", entity.UID)
+	}
+
+	return res.Activity[0], nil
+}
+
+func resolveWasDerivedFrom(p graphql.ResolveParams) (interface{}, error) {
+	entity, ok := p.Source.(*util.Entity)
+	if !ok {
+		return nil, fmt.Errorf(`nested entity "id" not set`)
+	}
+
+	query := db.NewQuery(db.QueryWasDerivedFrom)
+	query.SetVariable(db.VariableEntityID, entity.UID)
+	res, err := p.Context.Value(dbConnectionKey("db")).(*db.Client).RunQueryWithVars(query)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res.Entity) < 1 {
+		return nil, nil
+	}
+
+	return res.Entity, nil
+}
+
+func resolveWasAssociatedWith(p graphql.ResolveParams) (interface{}, error) {
+	activity, ok := p.Source.(*util.Activity)
+	if !ok {
+		return nil, fmt.Errorf(`nested activity "id" not set`)
+	}
+
+	query := db.NewQuery(db.QueryWasAssociatedWith)
+	query.SetVariable(db.VariableActivityID, activity.UID)
+	res, err := p.Context.Value(dbConnectionKey("db")).(*db.Client).RunQueryWithVars(query)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res.Agent) != 1 {
+		return nil, nil
+	}
+
+	return res.Agent[0], nil
+}
+
+func resolveUsed(p graphql.ResolveParams) (interface{}, error) {
+	activity, ok := p.Source.(*util.Activity)
+	if !ok {
+		return nil, fmt.Errorf(`nested activity "id" not set`)
+	}
+
+	query := db.NewQuery(db.QueryUsed)
+	query.SetVariable(db.VariableActivityID, activity.UID)
+	res, err := p.Context.Value(dbConnectionKey("db")).(*db.Client).RunQueryWithVars(query)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res.Entity) < 1 {
+		return nil, nil
+	}
+
+	return res.Entity, nil
+}
+
+func resolveActedOnBehalfOf(p graphql.ResolveParams) (interface{}, error) {
+	agent, ok := p.Source.(*util.Agent)
+	if !ok {
+		return nil, fmt.Errorf(`nested agent "id" not set`)
+	}
+	query := db.NewQuery(db.QueryActedOnBehalfOf)
+	query.SetVariable(db.VariableAgentID, agent.UID)
+	res, err := p.Context.Value(dbConnectionKey("db")).(*db.Client).RunQueryWithVars(query)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res.Agent) != 1 {
+		return nil, nil
+	}
+
+	return res.Agent[0], nil
+}
+
+func resolveProvGraph(p graphql.ResolveParams) (interface{}, error) {
 	id, ok := p.Args["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf(`field "id" not set`)
@@ -95,7 +194,7 @@ func resolveProvGraph(dbClient *db.Client, p graphql.ResolveParams) (*util.Graph
 	query := db.NewQuery(db.QueryProvenanceGraph)
 	query.SetVariable(db.VariableGraphRootID, id)
 
-	res, err := dbClient.RunQueryWithVars(query)
+	res, err := p.Context.Value(dbConnectionKey("db")).(*db.Client).RunQueryWithVars(query)
 	if err != nil {
 		return nil, err
 	}
@@ -103,10 +202,13 @@ func resolveProvGraph(dbClient *db.Client, p graphql.ResolveParams) (*util.Graph
 	if len(res.Graph) != 1 {
 		return nil, fmt.Errorf("%s is no valid graph root", id)
 	}
-	err = parseGraph(res.Graph[0])
-	if err != nil {
-		return nil, err
-	}
+
+	/*
+		err = parseGraph(res.Graph[0])
+		if err != nil {
+			return nil, err
+		}
+	*/
 
 	return res.Graph[0], nil
 }
