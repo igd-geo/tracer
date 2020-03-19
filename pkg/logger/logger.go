@@ -1,15 +1,16 @@
 package logger
 
 import (
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/rbmq"
 	"log"
+
+	"geocode.igd.fraunhofer.de/hummer/tracer/pkg/broker"
 )
 
 type Logger struct {
-	rbmq *rbmq.Session
+	rbmq *broker.Session
 }
 
-func NewLogger(rbSession *rbmq.Session) *Logger {
+func NewLogger(rbSession *broker.Session) *Logger {
 	return &Logger{
 		rbmq: rbSession,
 	}
