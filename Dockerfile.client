@@ -12,18 +12,11 @@ COPY ./ ./
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 	go build -ldflags="-w -s" \
 	-installsuffix "static" \
-	-o /go/bin/tracer /tracer/cmd/tracer
+	-o /go/bin/client /tracer/cmd/client
 
 FROM alpine:latest
 
-ENV DEPLOYMENT_ENVIRONMENT "PROD"
-ENV DATABASE_URL ""
-ENV BROKER_URL ""
-ENV BROKER_USER ""
-ENV BROKER_PASSWORD ""
-ENV BATCH_SIZE_LIMIT ""
-ENV BATCH_TIMEOUT ""
+COPY ./cmd/client/config.yml ./config.yml
+COPY --from=build /go/bin/client ./client
 
-COPY --from=build /go/bin/tracer /go/bin/tracer
-
-CMD "/go/bin/tracer"
+CMD "./client"

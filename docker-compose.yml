@@ -27,12 +27,20 @@ services:
     command: dgraph-ratel
 
   rabbitmq:
-    image: "rabbitmq:3-management"
+    image: rabbitmq:3-management
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - 5672:5672
+      - 15672:15672
     volumes:
-      - "rabbitmq_data:/data"
+      - rabbitmq_data:/data
+
+  tracer-client:
+    image: geocode.igd.fraunhofer.de:4567/hummer/tracer/client:latest
+
+  tracer-api:
+    image: geocode.igd.fraunhofer.de:4567/hummer/tracer/api:latest
+    ports:
+      - 8080:8080
 
 volumes:
   rabbitmq_data:
