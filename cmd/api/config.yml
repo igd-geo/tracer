@@ -1,0 +1,17 @@
+log:
+  debug: true
+  exchange: ""
+
+api:
+  port: ""
+
+database:
+  url: localhost:9080
+
+broker:
+  url: localhost:5672
+  user: guest
+  password: guest
+  exchange: scenario_0
+  bindingkey: "#.#.provenance"
+
