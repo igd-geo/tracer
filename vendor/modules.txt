@@ -1,14 +1,17 @@
 # github.com/dgraph-io/dgo v0.0.0-20190719212137-f244ef658cc5
+## explicit
 github.com/dgraph-io/dgo
 github.com/dgraph-io/dgo/protos/api
 github.com/dgraph-io/dgo/y
 # github.com/golang/protobuf v1.3.2
+## explicit
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
 # github.com/graphql-go/graphql v0.7.8
+## explicit
 github.com/graphql-go/graphql
 github.com/graphql-go/graphql/gqlerrors
 github.com/graphql-go/graphql/language/ast
@@ -21,8 +24,10 @@ github.com/graphql-go/graphql/language/source
 github.com/graphql-go/graphql/language/typeInfo
 github.com/graphql-go/graphql/language/visitor
 # github.com/pkg/errors v0.8.1
+## explicit
 github.com/pkg/errors
 # github.com/streadway/amqp v0.0.0-20190404075320-75d898a42a94
+## explicit
 github.com/streadway/amqp
 # golang.org/x/net v0.0.0-20190311183353-d8887717615a
 golang.org/x/net/http/httpguts
@@ -41,6 +46,7 @@ golang.org/x/text/unicode/norm
 # google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.22.0
+## explicit
 google.golang.org/grpc
 google.golang.org/grpc/balancer
 google.golang.org/grpc/balancer/base
@@ -75,4 +81,5 @@ google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
 # gopkg.in/yaml.v2 v2.2.8
+## explicit
 gopkg.in/yaml.v2
