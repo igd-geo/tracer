@@ -1,0 +1,24 @@
+log:
+  debug: true
+  exchange: ""
+
+batch:
+  size: 1000
+  timeout: 100
+
+database:
+  url: localhost:9080
+
+broker:
+  url: localhost:5672
+  user: guest
+  password: guest
+  exchange: scenario_0
+  bindingkey: "#.#.provenance"
+
+arbiter:
+  scenarioRegistry:
+    url: ""
+  serviceRegistry:
+    url: ""
+
