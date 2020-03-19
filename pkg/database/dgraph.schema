@@ -1,0 +1,11 @@
+<actedOnBehalfOf>: uid .
+<creationDate>: string .
+<endDate>: string .
+<id>: string @index(exact) @upsert .
+<name>: string .
+<startDate>: string .
+<test>: string .
+<type>: string .
+<uri>: string .
+<wasAssociatedWith>: uid .
+<wasGeneratedBy>: uid .

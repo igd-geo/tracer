@@ -1,45 +1,51 @@
-package db
+package database
 
 const (
+	// QueryEntityUIDByID GraphQL query to fetch an entity's uid
 	QueryEntityUIDByID = `query Entity($entity: string) {
-							entity(func: eq(id, $entity)) {
-								uid
-							}
-						}`
+		entity(func: eq(id, $entity)) {
+			uid
+		}
+	}`
 
+	// QueryActivityUIDByID GraqhQL query to fetch an activity's uid
 	QueryActivityUIDByID = `query Activity($activity: string) {
-							activity(func: eq(id, $activity)) {
-								uid
-							}
-						}`
+		activity(func: eq(id, $activity)) {
+			uid
+		}
+	}`
 
+	// QueryAgentUIDByID GraphQL query to fetch an agend's uid
 	QueryAgentUIDByID = `query Agent($agent: string) {
-							agent(func: eq(id, $agent)) {
-								uid
-							}
-						}`
+		agent(func: eq(id, $agent)) {
+			uid
+		}
+	}`
 
+	// QuerySupervisorUIDByID GraphQL query to fetch an agend's uid
 	QuerySupervisorUIDByID = `query Supervisor($supervisor: string) {
-								supervisor(func: eq(id, $supervisor)) {
-									uid
-								}
-							}`
+		supervisor(func: eq(id, $supervisor)) {
+			uid
+		}
+	}`
 
+	// QueryAllUIDsByID Combined GraphQL query to fetch the uids of several provenance components
 	QueryAllUIDsByID = `query All($entity: string, $activity: string, $agent: string, $supervisor: string) {
-							entity(func: eq(id, $entity)) {
-								uid
-							}
-							activity(func: eq(id, $activity)) {
-								uid
-							}
-							agent(func: eq(id, $agent)) {
-								uid
-							}
-							supervisor(func: eq(id, $supervisor)) {
-								uid
-							}
-						}`
+		entity(func: eq(id, $entity)) {
+			uid
+		}
+		activity(func: eq(id, $activity)) {
+			uid
+		}
+		agent(func: eq(id, $agent)) {
+			uid
+		}
+		supervisor(func: eq(id, $supervisor)) {
+			uid
+		}
+	}`
 
+	// QueryEntityFullByID GraphQL query to fetch an entity's attributes
 	QueryEntityFullByID = `query Entity($entity: string) {
 		entity(func: eq(id, $entity)) {
 			uid
@@ -48,6 +54,7 @@ const (
 		}
 	}`
 
+	// QueryActivityFullByID GraphQL query to fetch an activity's attributes
 	QueryActivityFullByID = `
 	query Activity($activity: string) {
 		activity(func: eq(id, $activity)) {
@@ -58,6 +65,7 @@ const (
 		}
 	}`
 
+	// QueryAgentFullByID GraphQL query to fetch an agent's attirbutes
 	QueryAgentFullByID = `
 	query Agent($agent: string) {
 		agent(func: eq(id, $agent)) {
@@ -69,6 +77,7 @@ const (
 		}
 	}`
 
+	// QueryWasGeneratedBy GraphQL query to fetch the activity that generated an entity
 	QueryWasGeneratedBy = `
 	query WasGeneratedBy($entity: string) {
 		var(func: uid($entity)) {
@@ -85,6 +94,7 @@ const (
 	 	}
 	}`
 
+	// QueryWasDerivedFrom GraphQL query to fetch an entity's ancestor
 	QueryWasDerivedFrom = `
 	query WasDerivedFrom($entity: string) {
 		var(func: uid($entity)) {
@@ -100,6 +110,7 @@ const (
 	 	}
 	}`
 
+	// QueryWasAssociatedWith GraphQL query to fetch an activities acting agent
 	QueryWasAssociatedWith = `
 	query WasAssociatedWith($activity: string) {
 		var(func: uid($activity)) {
@@ -117,6 +128,7 @@ const (
 	 	}
 	}`
 
+	// QueryActedOnBehalfOf GraphQL query to fetch an agents supervisor
 	QueryActedOnBehalfOf = `
 	query ActedOnBehalfOf($agent: string) {
 		var(func: uid($agent)) {
@@ -134,6 +146,7 @@ const (
 	 	}
 	}`
 
+	// QueryUsed GraphQL query to fetch an activity's used entities
 	QueryUsed = `
 	query Used($activity: string) {
 		var(func: uid($activity)) {
@@ -149,6 +162,8 @@ const (
 	 	}
 	}`
 
+	// QueryProvenanceGraph GraphQL query a complete provenance graph
+	// structure starting with an entity as root
 	QueryProvenanceGraph = `
 	query Graph($root: string) {
 		graph(func: eq(id,$root)) {
@@ -171,18 +186,25 @@ const (
 		}
 	}`
 
-	VariableEntityID     = "$entity"
-	VariableActivityID   = "$activity"
-	VariableAgentID      = "$agent"
+	// VariableEntityID Query variable for prepared query statements
+	VariableEntityID = "$entity"
+	// VariableActivityID Query variable for prepared query statements
+	VariableActivityID = "$activity"
+	// VariableAgentID Query variable for prepared query statements
+	VariableAgentID = "$agent"
+	// VariableSupervisorID Query variable for prepared query statements
 	VariableSupervisorID = "$supervisor"
-	VariableGraphRootID  = "$root"
+	// VariableGraphRootID Query variable for prepared query statements
+	VariableGraphRootID = "$root"
 )
 
+// Query Wrapper for GraphQL prepared query statements
 type Query struct {
 	queryString string
 	variables   map[string]string
 }
 
+// NewQuery Returns a new Query
 func NewQuery(queryString string) *Query {
 	return &Query{
 		queryString: queryString,
@@ -190,6 +212,7 @@ func NewQuery(queryString string) *Query {
 	}
 }
 
+// SetVariable Adds query variables to be used with prepared statements
 func (q *Query) SetVariable(key string, value string) {
 	q.variables[key] = value
 }

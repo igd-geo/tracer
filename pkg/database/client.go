@@ -1,4 +1,4 @@
-package db
+package database
 
 import (
 	"context"
@@ -6,63 +6,66 @@ import (
 	"log"
 	"time"
 
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/util"
+	"geocode.igd.fraunhofer.de/hummer/tracer/pkg/provenance"
 
 	"github.com/dgraph-io/dgo"
 	"github.com/dgraph-io/dgo/protos/api"
 	"google.golang.org/grpc"
 )
 
+// Config contains the database configuration
+type Config struct {
+	URL string `yaml:"url"`
+}
+
 // Client is a wrapper for a Dgraph connection
 type Client struct {
-	conn *dgo.Dgraph
+	dgraph *dgo.Dgraph
 }
 
 // Transaction bundles multiple entities to a mutation
 type Transaction struct {
-	Mutation  []*util.Entity
-	Size      int
-	StartTime time.Time
-	InCommit  bool
+	Mutation []*provenance.Entity
+	Size     int
 }
 
 // Result contains the results of a query
 type Result struct {
-	Entity     []*util.Entity   `json:"entity,omitempty"`
-	Activity   []*util.Activity `json:"activity,omitempty"`
-	Agent      []*util.Agent    `json:"agent,omitempty"`
-	Supervisor []*util.Agent    `json:"supervisor,omitempty"`
-	Graph      []*util.Graph    `json:"graph,omitempty"`
+	Entity     []*provenance.Entity   `json:"entity,omitempty"`
+	Activity   []*provenance.Activity `json:"activity,omitempty"`
+	Agent      []*provenance.Agent    `json:"agent,omitempty"`
+	Supervisor []*provenance.Agent    `json:"supervisor,omitempty"`
+	Graph      []*provenance.Graph    `json:"graph,omitempty"`
 }
 
-// NewClient returns a new Client
-func NewClient(url string) *Client {
-	d, err := grpc.Dial(url, grpc.WithInsecure())
+// New returns a new database client
+func New(config *Config) *Client {
+	grpcClient, err := grpc.Dial(config.URL, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(10*time.Second))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	return &Client{
-		conn: dgo.NewDgraphClient(
-			api.NewDgraphClient(d),
+		dgraph: dgo.NewDgraphClient(
+			api.NewDgraphClient(grpcClient),
 		),
 	}
 }
 
 // NewTransaction returns an empty Transaction
 func (c *Client) NewTransaction() *Transaction {
-	return &Transaction{
-		Mutation:  []*util.Entity{},
-		Size:      0,
-		StartTime: time.Now(),
+	transaction := &Transaction{
+		Mutation: []*provenance.Entity{},
+		Size:     0,
 	}
+	return transaction
 }
 
 // RunQuery runs the query and returns a result
 func (c *Client) RunQuery(query string) (Result, error) {
 	var res Result
 
-	resp, err := c.conn.NewReadOnlyTxn().Query(context.TODO(), query)
+	resp, err := c.dgraph.NewReadOnlyTxn().Query(context.TODO(), query)
 	if err != nil {
 		return res, err
 	}
@@ -79,7 +82,7 @@ func (c *Client) RunQuery(query string) (Result, error) {
 func (c *Client) RunQueryWithVars(query *Query) (Result, error) {
 	var res Result
 
-	resp, err := c.conn.NewReadOnlyTxn().QueryWithVars(context.TODO(), query.queryString, query.variables)
+	resp, err := c.dgraph.NewReadOnlyTxn().QueryWithVars(context.TODO(), query.queryString, query.variables)
 	if err != nil {
 		return res, err
 	}
@@ -93,8 +96,8 @@ func (c *Client) RunQueryWithVars(query *Query) (Result, error) {
 }
 
 // RunMutation runs a mutation
-func (c *Client) RunMutation(mutation *[]*util.Entity) (*api.Assigned, error) {
-	txn := c.conn.NewTxn()
+func (c *Client) RunMutation(mutation []*provenance.Entity) (*api.Assigned, error) {
+	txn := c.dgraph.NewTxn()
 	defer txn.Discard(context.TODO())
 
 	payload, err := json.Marshal(mutation)
@@ -112,4 +115,10 @@ func (c *Client) RunMutation(mutation *[]*util.Entity) (*api.Assigned, error) {
 		return nil, err
 	}
 	return assigned, nil
+}
+
+// Add appends new entities to an exisiting transaction
+func (t *Transaction) Add(entity *provenance.Entity) {
+	t.Mutation = append(t.Mutation, entity)
+	t.Size++
 }
