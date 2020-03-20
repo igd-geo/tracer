@@ -89,6 +89,18 @@ They routing key has to be structured as follows:
 <Service ID>.<Process ID>.provenance
 ```
 
+Provenance messages must have a JSON formatted body.
+
+**Note.** Currently Tracer can only generate provenacne for processes with a single output, however,
+multiple inputs are supported.
+```
+{
+  "timestamp": "2000.01.01 12:12:12.000",
+  "input": "["entityUID"]",
+  "output": "entityUID"
+}
+```
+
 ## Provenance Components
 Tracer uses a data model derived from W3C PROV-DM, see [W3C PROV](https://www.w3.org/TR/prov-dm/)
 for more, and therefore divides provenance into three main components:
