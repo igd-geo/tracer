@@ -91,7 +91,7 @@ They routing key has to be structured as follows:
 
 Provenance messages must have a JSON formatted body.
 
-**Note.** Currently Tracer can only generate provenacne for processes with a single output, however,
+**Note.** Currently Tracer can only generate provenance for processeses with a single output, however,
 multiple inputs are supported.
 ```
 {
