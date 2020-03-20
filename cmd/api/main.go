@@ -1,13 +1,14 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
 	"os/signal"
 
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/api"
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/api/config"
-	"geocode.igd.fraunhofer.de/hummer/tracer/internal/platform/db"
+	"geocode.igd.fraunhofer.de/hummer/tracer/api"
+	"geocode.igd.fraunhofer.de/hummer/tracer/api/config"
+	"geocode.igd.fraunhofer.de/hummer/tracer/pkg/database"
 )
 
 func main() {
@@ -16,11 +17,19 @@ func main() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
 
-	config := config.New()
+	configPath := flag.String("configPath", "config.yml", "location of config file")
+	flag.Parse()
 
-	db := db.NewClient(config.DB)
+	config, err := config.Parse(*configPath)
+	if err != nil {
+		log.Fatalf("failed to parse config: %s", err)
+	}
 
-	server := api.NewServer(config, db)
+	log.Println("connecting to database")
+	database := database.New(config.Database)
+
+	server := api.NewServer(config, database)
+	log.Println("starting server")
 	go server.Run()
 
 	<-signalChan

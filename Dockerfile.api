@@ -18,16 +18,9 @@ FROM alpine:latest
 
 RUN apk update && apk add ca-certificates
 
-ENV DEPLOYMENT_ENVIRONMENT "PROD"
-ENV DATABASE_URL ""
-ENV BROKER_URL ""
-ENV BROKER_USER ""
-ENV BROKER_PASSWORD ""
-ENV API_PORT ""
-
-
-COPY --from=build /go/bin/api /go/bin/api
+COPY ./cmd/api/config.yml ./config.yml
+COPY --from=build /go/bin/api ./api
 
 EXPOSE 8080
 
-CMD "/go/bin/api"
+CMD "./api"

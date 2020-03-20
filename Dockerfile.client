@@ -1,0 +1,22 @@
+FROM golang:alpine AS build
+
+RUN apk update && apk add --no-cache git ca-certificates
+
+WORKDIR /tracer
+
+COPY ./go.mod ./go.sum ./
+RUN GOPROXY=https://proxy.golang.org go mod download
+
+COPY ./ ./
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+	go build -ldflags="-w -s" \
+	-installsuffix "static" \
+	-o /go/bin/client /tracer/cmd/client
+
+FROM alpine:latest
+
+COPY ./cmd/client/config.yml ./config.yml
+COPY --from=build /go/bin/client ./client
+
+CMD "./client"

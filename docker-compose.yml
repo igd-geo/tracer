@@ -1,54 +1,46 @@
 version: "3.2"
 services:
   zero:
-    image: dgraph/dgraph:latest
+    image: dgraph/dgraph:v1.0.18
     volumes:
-      - type: volume
-        source: dgraph
-        target: /dgraph
-        volume:
-          nocopy: true
+      - /tmp/data:/dgraph
     ports:
       - 5080:5080
       - 6080:6080
     restart: on-failure
-    command: dgraph zero --my=zero:5080 --replicas 3
+    command: dgraph zero --my=zero:5080
 
-  alpha_1:
-    image: dgraph/dgraph:latest
+  alpha:
+    image: dgraph/dgraph:v1.0.18
     volumes:
-      - type: volume
-        source: alpha_1
-        target: /dgraph
-        volume:
-          nocopy: true
+      - /tmp/data:/dgraph
     ports:
       - 8080:8080
       - 9080:9080
     restart: on-failure
-    command: dgraph alpha --my=alpha_1:7080 --lru_mb=4096 --zero=zero:5080
+    command: dgraph alpha --my=alpha:7080 --lru_mb=2048 --zero=zero:5080
 
   ratel:
-    image: dgraph/dgraph:latest
-    volumes:
-      - type: volume
-        source: dgraph
-        target: /dgraph
-        volume:
-          nocopy: true
+    image: dgraph/dgraph:v1.0.18
     ports:
       - 8000:8000
     command: dgraph-ratel
 
   rabbitmq:
-    image: "rabbitmq:3-management"
+    image: rabbitmq:3-management
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - 5672:5672
+      - 15672:15672
     volumes:
-      - "rabbitmq_data:/data"
+      - rabbitmq_data:/data
+
+  tracer-client:
+    image: geocode.igd.fraunhofer.de:4567/hummer/tracer/client:latest
+
+  tracer-api:
+    image: geocode.igd.fraunhofer.de:4567/hummer/tracer/api:latest
+    ports:
+      - 8080:8080
 
 volumes:
-  dgraph:
-  alpha_1:
   rabbitmq_data:
